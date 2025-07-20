@@ -1,0 +1,18 @@
+{
+  "name": "playwright_controller",
+  "displayName": "Playwright控制器",
+  "version": "1.0.0",
+  "description": "GitHub文档检索和翻译系统的控制器，负责协调浏览器Agent和文档处理Agent的工作流程",
+  "author": "Naga Playwright模块",
+  "agentType": "agent",
+  "modelId": "{{MODEL_NAME}}",
+  "modelProvider": "openai",
+  "apiBaseUrl": "{{BASE_URL}}",
+  "apiKey": "{{API_KEY}}",
+  "temperature": 0.1,
+  "maxOutputTokens": 40000,
+  "executionMethod": {
+    "module": "mcpserver.agent_playwright_master.playwright",
+    "function": "handle_agent_manager_request"
+  }
+} 

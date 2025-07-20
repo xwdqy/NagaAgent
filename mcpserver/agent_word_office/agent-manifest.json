@@ -1,0 +1,324 @@
+{
+  "name": "word-document-server",
+  "displayName": "Word文档处理助手",
+  "description": "专业的Microsoft Word文档处理助手，支持创建、编辑、格式化、保护、PDF导出等丰富功能。可以处理各种Word文档操作需求，包括内容添加、样式设置、表格处理、文档保护等。",
+  "version": "1.1.7",
+  "agentType": "agent",
+  "modelId": "deepseek-chat",
+  "modelProvider": "openai",
+  "apiBaseUrl": "https://api.deepseek.com/v1",
+  "apiKey": "",
+  "temperature": 0.7,
+  "maxOutputTokens": 8192,
+  "entryPoint": {
+    "module": "mcpserver.word_agent.word_agent",
+    "class": "WordAgent"
+  },
+  "systemPrompt": "你是一个专业的Microsoft Word文档处理助手，名为Word文档处理助手。你的主要职责是帮助用户处理各种Word文档操作需求。\n\n你的核心能力包括：\n1. 文档管理：创建、复制、合并、获取信息、转PDF\n2. 内容添加：标题、段落、表格、图片、分页符、目录\n3. 内容提取：全文、指定段落、结构、大纲、查找文本\n4. 文本格式化：加粗、斜体、下划线、颜色、字体、样式\n5. 表格格式化：边框、底纹、表头、样式\n6. 脚注/尾注：插入、转换、查找、格式化\n7. 文档保护：加密、限制编辑、数字签名、验证、解除保护\n\n当用户提出Word文档相关需求时，你应该：\n1. 理解用户的具体需求\n2. 提供详细的操作建议和步骤\n3. 如果需要实际操作文档，使用可用的工具函数\n4. 确保操作的安全性和准确性\n5. 提供清晰的结果反馈\n\n请始终保持专业、耐心和准确，确保每个Word文档操作都能达到用户的期望效果。",
+  "capabilities": {
+    "invocationCommands": [
+      {
+        "command": "create_document",
+        "description": "创建新的Word文档",
+        "example": "{\"action\": \"create_document\", \"filename\": \"report.docx\", \"title\": \"项目报告\", \"author\": \"张三\"}"
+      },
+      {
+        "command": "add_heading",
+        "description": "添加标题到文档",
+        "example": "{\"action\": \"add_heading\", \"filename\": \"report.docx\", \"text\": \"项目概述\", \"level\": 1}"
+      },
+      {
+        "command": "add_paragraph",
+        "description": "添加段落到文档",
+        "example": "{\"action\": \"add_paragraph\", \"filename\": \"report.docx\", \"text\": \"这是一个段落内容。\", \"style\": \"Normal\"}"
+      },
+      {
+        "command": "add_table",
+        "description": "添加表格到文档",
+        "example": "{\"action\": \"add_table\", \"filename\": \"report.docx\", \"rows\": 3, \"cols\": 4, \"data\": [[\"项目\", \"进度\", \"负责人\", \"状态\"], [\"模块A\", \"80%\", \"张三\", \"进行中\"], [\"模块B\", \"60%\", \"李四\", \"进行中\"]]}"
+      },
+      {
+        "command": "add_picture",
+        "description": "添加图片到文档",
+        "example": "{\"action\": \"add_picture\", \"filename\": \"report.docx\", \"image_path\": \"/path/to/image.jpg\", \"width\": 6.0}"
+      },
+      {
+        "command": "format_text",
+        "description": "格式化文档中的文本",
+        "example": "{\"action\": \"format_text\", \"filename\": \"report.docx\", \"paragraph_index\": 0, \"start_pos\": 0, \"end_pos\": 10, \"bold\": true, \"color\": \"red\"}"
+      },
+      {
+        "command": "search_and_replace",
+        "description": "在文档中搜索并替换文本",
+        "example": "{\"action\": \"search_and_replace\", \"filename\": \"report.docx\", \"find_text\": \"旧文本\", \"replace_text\": \"新文本\"}"
+      },
+      {
+        "command": "get_document_info",
+        "description": "获取文档信息",
+        "example": "{\"action\": \"get_document_info\", \"filename\": \"report.docx\"}"
+      },
+      {
+        "command": "get_document_text",
+        "description": "提取文档文本内容",
+        "example": "{\"action\": \"get_document_text\", \"filename\": \"report.docx\"}"
+      },
+      {
+        "command": "get_document_outline",
+        "description": "获取文档大纲结构",
+        "example": "{\"action\": \"get_document_outline\", \"filename\": \"report.docx\"}"
+      },
+      {
+        "command": "list_available_documents",
+        "description": "列出指定目录中的可用文档",
+        "example": "{\"action\": \"list_available_documents\", \"directory\": \".\"}"
+      },
+      {
+        "command": "copy_document",
+        "description": "复制文档",
+        "example": "{\"action\": \"copy_document\", \"source_filename\": \"original.docx\", \"destination_filename\": \"backup.docx\"}"
+      },
+      {
+        "command": "convert_to_pdf",
+        "description": "将Word文档转换为PDF",
+        "example": "{\"action\": \"convert_to_pdf\", \"filename\": \"report.docx\", \"output_filename\": \"report.pdf\"}"
+      },
+      {
+        "command": "add_footnote_to_document",
+        "description": "添加脚注到文档",
+        "example": "{\"action\": \"add_footnote_to_document\", \"filename\": \"report.docx\", \"paragraph_index\": 0, \"footnote_text\": \"这是脚注内容\"}"
+      },
+      {
+        "command": "add_endnote_to_document",
+        "description": "添加尾注到文档",
+        "example": "{\"action\": \"add_endnote_to_document\", \"filename\": \"report.docx\", \"paragraph_index\": 0, \"endnote_text\": \"这是尾注内容\"}"
+      },
+      {
+        "command": "protect_document",
+        "description": "为文档添加密码保护",
+        "example": "{\"action\": \"protect_document\", \"filename\": \"report.docx\", \"password\": \"secure123\"}"
+      },
+      {
+        "command": "unprotect_document",
+        "description": "解除文档保护",
+        "example": "{\"action\": \"unprotect_document\", \"filename\": \"report.docx\", \"password\": \"secure123\"}"
+      },
+      {
+        "command": "create_custom_style",
+        "description": "创建自定义样式",
+        "example": "{\"action\": \"create_custom_style\", \"filename\": \"report.docx\", \"style_name\": \"CustomHeading\", \"bold\": true, \"font_size\": 16, \"color\": \"blue\"}"
+      },
+      {
+        "command": "format_table",
+        "description": "格式化表格",
+        "example": "{\"action\": \"format_table\", \"filename\": \"report.docx\", \"table_index\": 0, \"has_header_row\": true, \"border_style\": \"single\"}"
+      },
+      {
+        "command": "add_page_break",
+        "description": "添加分页符",
+        "example": "{\"action\": \"add_page_break\", \"filename\": \"report.docx\"}"
+      },
+      {
+        "command": "delete_paragraph",
+        "description": "删除指定段落",
+        "example": "{\"action\": \"delete_paragraph\", \"filename\": \"report.docx\", \"paragraph_index\": 1}"
+      },
+      {
+        "command": "get_paragraph_text_from_document",
+        "description": "获取指定段落的文本",
+        "example": "{\"action\": \"get_paragraph_text_from_document\", \"filename\": \"report.docx\", \"paragraph_index\": 0}"
+      },
+      {
+        "command": "find_text_in_document",
+        "description": "在文档中查找文本",
+        "example": "{\"action\": \"find_text_in_document\", \"filename\": \"report.docx\", \"text_to_find\": \"关键词\", \"match_case\": true, \"whole_word\": false}"
+      },
+      {
+        "command": "customize_footnote_style",
+        "description": "自定义脚注样式",
+        "example": "{\"action\": \"customize_footnote_style\", \"filename\": \"report.docx\", \"numbering_format\": \"1, 2, 3\", \"start_number\": 1, \"font_name\": \"Arial\", \"font_size\": 10}"
+      }
+    ]
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "description": "要执行的操作名称",
+        "enum": [
+          "create_document", "add_heading", "add_paragraph", "add_table", "add_picture",
+          "format_text", "search_and_replace", "get_document_info", "get_document_text",
+          "get_document_outline", "list_available_documents", "copy_document",
+          "convert_to_pdf", "add_footnote_to_document", "add_endnote_to_document",
+          "protect_document", "unprotect_document", "create_custom_style",
+          "format_table", "add_page_break", "delete_paragraph",
+          "get_paragraph_text_from_document", "find_text_in_document",
+          "customize_footnote_style"
+        ]
+      },
+      "filename": {
+        "type": "string",
+        "description": "要操作的文档文件名"
+      },
+      "text": {
+        "type": "string",
+        "description": "文本内容"
+      },
+      "title": {
+        "type": "string",
+        "description": "文档标题"
+      },
+      "author": {
+        "type": "string",
+        "description": "文档作者"
+      },
+      "level": {
+        "type": "integer",
+        "description": "标题级别（1-6）",
+        "minimum": 1,
+        "maximum": 6
+      },
+      "style": {
+        "type": "string",
+        "description": "样式名称"
+      },
+      "rows": {
+        "type": "integer",
+        "description": "表格行数"
+      },
+      "cols": {
+        "type": "integer",
+        "description": "表格列数"
+      },
+      "data": {
+        "type": "array",
+        "description": "表格数据"
+      },
+      "image_path": {
+        "type": "string",
+        "description": "图片文件路径"
+      },
+      "width": {
+        "type": "number",
+        "description": "图片宽度（英寸）"
+      },
+      "paragraph_index": {
+        "type": "integer",
+        "description": "段落索引"
+      },
+      "start_pos": {
+        "type": "integer",
+        "description": "起始位置"
+      },
+      "end_pos": {
+        "type": "integer",
+        "description": "结束位置"
+      },
+      "bold": {
+        "type": "boolean",
+        "description": "是否加粗"
+      },
+      "italic": {
+        "type": "boolean",
+        "description": "是否斜体"
+      },
+      "underline": {
+        "type": "boolean",
+        "description": "是否下划线"
+      },
+      "color": {
+        "type": "string",
+        "description": "文本颜色"
+      },
+      "font_size": {
+        "type": "integer",
+        "description": "字体大小"
+      },
+      "font_name": {
+        "type": "string",
+        "description": "字体名称"
+      },
+      "find_text": {
+        "type": "string",
+        "description": "要查找的文本"
+      },
+      "replace_text": {
+        "type": "string",
+        "description": "要替换的文本"
+      },
+      "directory": {
+        "type": "string",
+        "description": "目录路径"
+      },
+      "source_filename": {
+        "type": "string",
+        "description": "源文件名"
+      },
+      "destination_filename": {
+        "type": "string",
+        "description": "目标文件名"
+      },
+      "output_filename": {
+        "type": "string",
+        "description": "输出文件名"
+      },
+      "footnote_text": {
+        "type": "string",
+        "description": "脚注文本"
+      },
+      "endnote_text": {
+        "type": "string",
+        "description": "尾注文本"
+      },
+      "password": {
+        "type": "string",
+        "description": "密码"
+      },
+      "style_name": {
+        "type": "string",
+        "description": "样式名称"
+      },
+      "base_style": {
+        "type": "string",
+        "description": "基础样式"
+      },
+      "table_index": {
+        "type": "integer",
+        "description": "表格索引"
+      },
+      "has_header_row": {
+        "type": "boolean",
+        "description": "是否有表头行"
+      },
+      "border_style": {
+        "type": "string",
+        "description": "边框样式"
+      },
+      "shading": {
+        "type": "array",
+        "description": "底纹设置"
+      },
+      "text_to_find": {
+        "type": "string",
+        "description": "要查找的文本"
+      },
+      "match_case": {
+        "type": "boolean",
+        "description": "是否区分大小写"
+      },
+      "whole_word": {
+        "type": "boolean",
+        "description": "是否全字匹配"
+      },
+      "numbering_format": {
+        "type": "string",
+        "description": "编号格式"
+      },
+      "start_number": {
+        "type": "integer",
+        "description": "起始编号"
+      }
+    },
+    "required": ["action"]
+  }
+} 

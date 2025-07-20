@@ -1,0 +1,188 @@
+{
+  // 系统基础配置
+  "system": {
+    "version": "3.0",                    // 系统版本号
+    "voice_enabled": true,               // 是否启用语音功能
+    "stream_mode": true,                 // 是否启用流式输出
+    "debug": false,                      // 是否启用调试模式
+    "log_level": "WARNING"               // 日志级别：DEBUG/INFO/WARNING/ERROR
+  },
+
+  // LLM API配置
+  "api": {
+    "api_key": "sk-xxx",                 // LLM API密钥
+    "base_url": "https://api.deepseek.com/v1", // LLM API基础URL
+    "model": "deepseek-chat",            // 使用的模型名称
+    "temperature": 0.7,                  // 温度参数 (0.0-2.0)
+    "max_tokens": 2000,                  // 最大输出token数 (1-8192)
+    "max_history_rounds": 10             // 最大历史轮数 (1-100)
+  },
+
+  // API服务器配置
+  "api_server": {
+    "enabled": true,                     // 是否启用API服务器
+    "host": "127.0.0.1",                 // API服务器主机地址
+    "port": 8000,                        // API服务器端口 (1-65535)
+    "auto_start": true,                  // 启动时自动启动API服务器
+    "docs_enabled": true                 // 是否启用API文档
+  },
+
+  // GRAG知识图谱记忆系统配置
+  "grag": {
+    "enabled": false,                    // 是否启用GRAG记忆系统
+    "auto_extract": false,               // 是否自动提取对话中的三元组
+    "context_length": 5,                 // 记忆上下文长度 (1-20)
+    "similarity_threshold": 0.6,         // 记忆检索相似度阈值 (0.0-1.0)
+    "neo4j_uri": "neo4j://127.0.0.1:7687", // Neo4j连接URI
+    "neo4j_user": "neo4j",               // Neo4j用户名
+    "neo4j_password": "your_password",   // Neo4j密码
+    "neo4j_database": "neo4j"            // Neo4j数据库名
+  },
+
+  // 工具调用循环配置
+  "handoff": {
+    "max_loop_stream": 5,                // 流式模式最大工具调用循环次数 (1-20)
+    "max_loop_non_stream": 5,            // 非流式模式最大工具调用循环次数 (1-20)
+    "show_output": false                 // 是否显示工具调用输出
+  },
+
+  // MCP服务配置
+  "mcp": {
+    "agent_tool_name": "agent",          // 用于调用Agent的特殊工具名
+    "agent_priority": true,              // 当服务名冲突时，Agent服务优先
+    "auto_discover_agents": true,        // 自动发现和注册Agent服务
+    "auto_discover_mcp": true,           // 自动发现和注册MCP服务
+    "exclude_agent_tools_from_mcp": true // 从MCP服务中排除已注册为Agent的服务
+  },
+
+  // 浏览器配置
+  "browser": {
+    "path": null,                        // 浏览器可执行文件路径（null为自动检测）
+    "playwright_headless": false,        // Playwright浏览器是否无头模式
+    "edge_lnk_path": "C:\\Users\\DREEM\\Desktop\\Microsoft Edge.lnk", // Edge浏览器快捷方式路径
+    "edge_common_paths": [               // Edge浏览器常见安装路径
+      "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+      "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+      "C:\\Users\\DREEM\\AppData\\Local\\Microsoft\\Edge\\Application\\msedge.exe"
+    ]
+  },
+
+  // TTS语音合成服务配置
+  "tts": {
+    "api_key": "your_api_key_here",      // TTS服务API密钥
+    "port": 5050,                        // TTS服务端口 (1-65535)
+    "default_voice": "zh-CN-XiaoxiaoNeural", // 默认语音
+    "default_format": "mp3",             // 默认音频格式
+    "default_speed": 1.0,                // 默认语速 (0.1-3.0)
+    "default_language": "zh-CN",         // 默认语言
+    "remove_filter": false,              // 是否移除过滤
+    "expand_api": true,                  // 是否扩展API
+    "require_api_key": true,             // 是否需要API密钥
+    "provider": "edgetts",               // TTS提供商
+    "group_id": "your_minimax_group_id_here", // MiniMax组ID
+    "tts_model": "speech-02-hd",         // TTS模型
+    "emotion": "neutral"                 // 情感设置
+  },
+
+  // 天气服务配置
+  "weather": {
+    "api_key": "your_weather_api_key_here", // 高德地图天气API密钥
+    "enabled": true,                     // 是否启用天气查询功能
+    "default_city": "",                  // 默认查询城市
+    "cache_duration": 1800               // 天气数据缓存时间（秒）(60-3600)
+  },
+
+  // MQTT设备控制配置
+  "mqtt": {
+    "enabled": false,                    // 是否启用MQTT功能
+    "broker": "broker.emqx.io",          // MQTT服务器地址
+    "port": 1883,                        // MQTT服务器端口 (1-65535)
+    "topic": "device/switch",            // 设备控制主题
+    "client_id": "mcp_device_switch",    // MQTT客户端ID
+    "username": "",                      // MQTT用户名（可选）
+    "password": ""                       // MQTT密码（可选）
+  },
+
+  // 快速响应小模型配置
+  "quick_model": {
+    "enabled": false,                    // 是否启用小模型
+    "api_key": "",                       // 小模型API密钥
+    "base_url": "",                      // 小模型API地址
+    "model_name": "qwen2.5-1.5b-instruct", // 小模型名称
+    "max_tokens": 512,                   // 小模型输出限制 (1-2048)
+    "temperature": 0.05,                 // 小模型温度 (0.0-1.0)
+    "timeout": 5,                        // 快速响应超时时间 (1-60秒)
+    "max_retries": 2,                    // 最大重试次数 (0-5)
+    "quick_decision_enabled": false,     // 快速决策功能
+    "json_format_enabled": false,        // JSON格式化功能
+    "output_filter_enabled": false,      // 输出内容过滤功能
+    "difficulty_judgment_enabled": false, // 问题难度判断功能
+    "scoring_system_enabled": false,     // 黑白名单打分系统
+    "thinking_completeness_enabled": false // 思考完整性判断功能
+  },
+
+  // 输出过滤配置
+  "filter": {
+    "filter_think_tags": true,           // 过滤思考标签内容
+    "filter_patterns": [                 // 过滤正则表达式模式
+      "<think>.*?</think>",
+      "<thinking>.*?</thinking>",
+      "<reflection>.*?</reflection>",
+      "<internal>.*?</internal>"
+    ],
+    "clean_output": true                 // 清理多余空白字符
+  },
+
+  // 问题难度判断配置
+  "difficulty": {
+    "enabled": false,                    // 是否启用难度判断
+    "use_small_model": false,            // 使用小模型进行难度判断
+    "difficulty_levels": [               // 难度级别
+      "简单", "中等", "困难", "极难"
+    ],
+    "factors": [                         // 难度评估因素
+      "概念复杂度", "推理深度", "知识广度", "计算复杂度", "创新要求"
+    ],
+    "threshold_simple": 2,               // 简单问题阈值 (1-10)
+    "threshold_medium": 4,               // 中等问题阈值 (1-10)
+    "threshold_hard": 6                  // 困难问题阈值 (1-10)
+  },
+
+  // 黑白名单打分系统配置
+  "scoring": {
+    "enabled": false,                    // 是否启用打分系统
+    "score_range": [1, 5],               // 评分范围
+    "score_threshold": 2,                // 结果保留阈值 (1-5)
+    "similarity_threshold": 0.85,        // 相似结果识别阈值 (0.0-1.0)
+    "max_user_preferences": 3,           // 用户最多选择偏好数 (1-10)
+    "default_preferences": [             // 默认偏好设置
+      "逻辑清晰准确", "实用性强", "创新思维"
+    ],
+    "penalty_for_similar": 1,            // 相似结果的惩罚分数 (0-3)
+    "min_results_required": 2,           // 最少保留结果数量 (1-10)
+    "strict_filtering": true             // 严格过滤模式
+  },
+
+  // 思考完整性判断配置
+  "thinking": {
+    "enabled": false,                    // 是否启用思考完整性判断
+    "use_small_model": false,            // 使用小模型判断思考完整性
+    "completeness_criteria": [           // 完整性评估标准
+      "问题分析充分", "解决方案明确", "逻辑链条完整", "结论清晰合理"
+    ],
+    "completeness_threshold": 0.8,       // 完整性阈值 (0.0-1.0)
+    "max_thinking_depth": 5,             // 最大思考深度层级 (1-10)
+    "next_question_generation": false    // 生成下一级问题
+  },
+
+  // 用户界面配置
+  "ui": {
+    "user_name": "用户",                 // 默认用户名
+    "bg_alpha": 0.5,                     // 聊天背景透明度 (0.0-1.0)
+    "window_bg_alpha": 110,              // 主窗口背景透明度 (0-255)
+    "mac_btn_size": 36,                  // Mac按钮大小 (10-100)
+    "mac_btn_margin": 16,                // Mac按钮边距 (0-50)
+    "mac_btn_gap": 12,                   // Mac按钮间距 (0-30)
+    "animation_duration": 600            // 动画时长（毫秒）(100-2000)
+  }
+}
