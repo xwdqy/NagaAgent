@@ -18,10 +18,12 @@ class WeatherTimeTool:
         self._get_local_ip_and_city() # 初始化时获取本地IP和城市
         import asyncio
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
+            # 使用新的asyncio API避免弃用警告
+            try:
+                loop = asyncio.get_running_loop()
                 asyncio.create_task(self._preload_ip_info())
-            else:
+            except RuntimeError:
+                # 没有运行中的事件循环，使用同步方式
                 self._ip_info = None # 不再异步获取IP
         except Exception:
             self._ip_info = None

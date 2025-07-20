@@ -33,18 +33,29 @@ load_dotenv() # 加载环境变量文件
 # 这是为了防止SDK默认向OpenAI发送追踪数据进行agent调试，因为我们使用的是 DeepSeek API，是没有OpenAI API密钥的，防止它自动请求 OpenAI API
 set_tracing_disabled(True)
 
-# 从环境变量中读取这些值
-API_KEY = os.getenv("API_KEY") # 从环境变量中读取API_KEY,用于DeepSeek API 的认证
-BASE_URL = os.getenv("BASE_URL") # 从环境变量中读取BASE_URL,用于DeepSeek API 的地址
-MODEL_NAME = os.getenv("MODEL_NAME") # 从环境变量中读取MODEL_NAME,用于DeepSeek API 的模型名称
+# 从config.json文件中读取配置
+try:
+    from config import load_config
+    config = load_config()
+    API_KEY = config.api.api_key # 从config.json中读取API_KEY
+    BASE_URL = config.api.base_url # 从config.json中读取BASE_URL
+    MODEL_NAME = config.api.model # 从config.json中读取MODEL_NAME
+    print(f"✅ 从config.json加载配置成功: {MODEL_NAME}")
+except Exception as e:
+    print(f"❌ 从config.json加载配置失败: {e}")
+    # 如果config加载失败，尝试从环境变量读取（兼容性）
+    API_KEY = os.getenv("API_KEY")
+    BASE_URL = os.getenv("BASE_URL")
+    MODEL_NAME = os.getenv("MODEL_NAME")
+    print(f"⚠️ 使用环境变量配置: {MODEL_NAME}")
 
 # 验证必须的配置是否存在
 if not API_KEY:
-  raise ValueError("API_KEY 未在环境变量中设置")
+    raise ValueError("API_KEY 未在config.json或环境变量中设置")
 if not BASE_URL:
-  raise ValueError("BASE_URL 未在环境变量中设置")
+    raise ValueError("BASE_URL 未在config.json或环境变量中设置")
 if not MODEL_NAME:
-  MODEL_NAME = "deepseek-chat"
+    MODEL_NAME = "deepseek-chat"
 
 
 client = AsyncOpenAI(
