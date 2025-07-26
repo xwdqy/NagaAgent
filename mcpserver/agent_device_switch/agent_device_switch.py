@@ -4,7 +4,7 @@ from agents import Agent
 
 # 导入设备开关工具
 try:
-    from mqtt_tool.device_switch import switch_devices
+    from mqtt_tool.device_switch import device_manager
 except Exception as e:
     print(f"导入设备开关工具失败: {e}")
 
@@ -32,14 +32,24 @@ class AgentMqttTool(Agent):
                 }, ensure_ascii=False)
             device1 = data.get("device1")
             device2 = data.get("device2")
-            if device1 is None or device2 is None:
+            device3 = data.get("device3")
+            if device1 is None or device2 is None or device3 is None:
                 return json.dumps({
                     "status": "error",
-                    "message": "switch_devices操作需要device1和device2参数",
+                    "message": "switch_devices操作需要device1、device2和device3参数",
                     "data": {}
                 }, ensure_ascii=False)
             # 调用设备开关工具
-            result = switch_devices(device1, device2)
+            success, message = device_manager.switch_devices(device1, device2, device3)
+            result = {
+                "success": success,
+                "message": message,
+                "data": {
+                    "device1": device1,
+                    "device2": device2,
+                    "device3": device3
+                }
+            }
             return json.dumps(result, ensure_ascii=False)
         except Exception as e:
             return json.dumps({

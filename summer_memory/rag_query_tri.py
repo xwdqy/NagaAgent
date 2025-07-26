@@ -20,8 +20,10 @@ recent_context = []
 def set_context(texts):
     """设置查询上下文"""
     global recent_context
-    recent_context = texts[:0]  # 限制上下文长度
-    logger.info(f"更新查询上下文: {recent_context}")
+    # 使用配置中的上下文长度，默认为5
+    context_length = getattr(config.grag, 'context_length', 5)
+    recent_context = texts[:context_length]  # 限制上下文长度
+    logger.info(f"更新查询上下文: {len(recent_context)} 条记录")
 
 def query_knowledge(user_question):
     """使用 DeepSeek API 提取关键词并查询知识图谱"""

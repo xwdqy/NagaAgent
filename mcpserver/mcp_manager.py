@@ -547,10 +547,9 @@ class MCPManager:
     def auto_register_services(self):
         """自动注册所有MCP服务和handoff"""
         try:
-            # 调用mcp_registry的扫描注册函数
-            from mcpserver.mcp_registry import scan_and_register_mcp_agents
-            registered = scan_and_register_mcp_agents()
-            sys.stderr.write(f"✅ MCP服务已通过动态扫描自动注册完成，共注册 {len(registered)} 个服务\n")
+            # 新的动态注册系统已经自动扫描并注册了所有MCP服务
+            # 不再需要手动注册handoff服务
+            sys.stderr.write("✅ MCP服务已通过动态扫描自动注册完成\n")
         except Exception as e:
             sys.stderr.write(f"❌ 自动注册服务失败: {e}\n")
             import traceback

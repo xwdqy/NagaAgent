@@ -18,12 +18,10 @@ class WeatherTimeTool:
         self._get_local_ip_and_city() # 初始化时获取本地IP和城市
         import asyncio
         try:
-            # 使用新的asyncio API避免弃用警告
-            try:
-                loop = asyncio.get_running_loop()
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
                 asyncio.create_task(self._preload_ip_info())
-            except RuntimeError:
-                # 没有运行中的事件循环，使用同步方式
+            else:
                 self._ip_info = None # 不再异步获取IP
         except Exception:
             self._ip_info = None
@@ -50,17 +48,12 @@ class WeatherTimeTool:
 
     async def get_weather(self, province, city):
         """调用高德地图天气接口，返回实况天气+未来3天预报"""  # 右侧注释
-        # 从config获取API key
-        try:
-            from config import WEATHER_API_KEY
-            api_key = WEATHER_API_KEY
-        except ImportError:
-            # 兼容旧版本，从config.json获取API key
-            import os
-            config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config.json')
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-            api_key = config.get('weather_api_key') or config.get('weather', {}).get('api_key')
+        # 从config.json获取API key
+        import os
+        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config.json')
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        api_key = config.get('weather_api_key')
         
         url = f'https://restapi.amap.com/v3/weather/weatherInfo?city={city}&key={api_key}&extensions=all'
         async with aiohttp.ClientSession() as session:

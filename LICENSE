@@ -23,11 +23,11 @@ of the Software, subject to the following conditions:
 4. **Modifications and Derivative Works:** All modified or derivative versions of 
    the Software must, at the time of distribution, retain in a prominent location 
    (such as in the software documentation, about box, or the footer of the user interface) 
-   the original author's signature and complete copyright notice, along with a clear 
+   the original author’s signature and complete copyright notice, along with a clear 
    indication that modifications have been made. Failure to comply with this requirement 
    will be considered a violation of this License.
 
-5. **Definition and Restriction of Commercial Use:** Within this License, "commercial use" 
+5. **Definition and Restriction of Commercial Use:** Within this License, “commercial use” 
    is defined strictly as the use of the Software by companies, development teams, formal 
    institutions, or other organizations for business or profit-making purposes. Use by 
    individual persons for non-profit or personal purposes does not constitute commercial use.
@@ -40,34 +40,3 @@ FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER 
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION 
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
----
-
-版权所有 (c) 2025 柏斯阔落
-
-特此免费授予任何获得本软件副本和相关文档文件（"软件"）的人，在不受限制的情况下处理
-本软件的权利，包括但不限于使用、复制、修改、合并、发布、分发、再许可和/或销售软件
-副本的权利，但须符合以下条件：
-
-1. 上述版权声明和本许可声明应包含在软件的所有副本或重要部分中。
-
-2. 任何软件的分发，或其重要部分，包括修改版本，必须承认原始作品是由
-   柏斯阔落创建的。此类归属应以最终用户清楚可见的方式提供，例如在软件文档、
-   关于框或用户界面的页脚中。
-
-3. **商业使用限制：** 任何软件或其重要部分的商业使用，只有在与原作者
-   柏斯阔落事先协商并获得明确授权后才被允许。未经授权的商业使用严格禁止。
-
-4. **修改和衍生作品：** 软件的所有修改或衍生版本在分发时必须在其显著位置
-   （如软件文档、关于框或用户界面的页脚）保留原作者签名和完整的版权声明，
-   并清楚标明已进行修改。未能遵守此要求将被视为违反本许可。
-
-5. **商业使用的定义和限制：** 在本许可中，"商业使用"严格定义为公司、
-   开发团队、正式机构或其他组织出于商业或营利目的使用软件。个人出于非营利
-   或个人目的的使用不构成商业使用。任何未经与原作者柏斯阔落事先协商和明确
-   授权而将软件（或其重要部分）用于商业目的的行为都是被禁止的。
-
-本软件按"原样"提供，不提供任何明示或暗示的保证，包括但不限于对适销性、
-特定用途适用性和非侵权性的保证。在任何情况下，作者或版权持有人均不对任何
-索赔、损害或其他责任承担责任，无论是在合同、侵权或其他诉讼中，由软件或
-软件的使用或其他交易引起、产生或与之相关。

@@ -6,7 +6,7 @@ authors = [
     {name = "柏斯阔落", email = "1781393885@qq.com"},
 ]
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.13"
 dependencies = [
     # 核心依赖
     "mcp>=1.6.0",

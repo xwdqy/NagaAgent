@@ -3,7 +3,6 @@ import os
 # import asyncio # 日志与系统
 from datetime import datetime # 时间
 from mcpserver.mcp_manager import get_mcp_manager # 多功能管理
-from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX # handoff提示词
 # from mcpserver.agent_playwright_master import ControllerAgent, BrowserAgent, ContentAgent # 导入浏览器相关类
 from openai import OpenAI,AsyncOpenAI # LLM
 # import difflib # 模糊匹配
@@ -20,12 +19,16 @@ from config import config
 
 # 完全禁用GRAG记忆系统导入
 # GRAG记忆系统导入
-try:
-    from summer_memory.memory_manager import memory_manager
-except Exception as e:
-    logger = logging.getLogger("NagaConversation")
-    logger.error(f"夏园记忆系统加载失败: {e}")
-    memory_manager = None
+# if config.grag.enabled:
+#     try:
+#         from summer_memory.memory_manager import memory_manager
+
+#     except Exception as e:
+#         logger = logging.getLogger("NagaConversation")
+#         logger.error(f"夏园记忆系统加载失败: {e}")
+#         memory_manager = None
+# else:
+#     memory_manager = None
 
 def now():
     return time.strftime('%H:%M:%S:')+str(int(time.time()*1000)%10000) # 当前时间
@@ -69,7 +72,8 @@ class NagaConversation: # 对话主类
         self._init_mcp_services()
         
         # 初始化GRAG记忆系统（只在首次初始化时显示日志）
-        self.memory_manager = memory_manager
+        # 完全禁用GRAG记忆系统
+        self.memory_manager = None
         # if self.memory_manager and not hasattr(self.__class__, '_memory_initialized'):
         #     logger.info("夏园记忆系统已初始化")
         #     self.__class__._memory_initialized = True
@@ -198,81 +202,75 @@ class NagaConversation: # 对话主类
 
     # 工具调用循环相关方法
     def _parse_tool_calls(self, content: str) -> list:
-        """解析TOOL_REQUEST格式的工具调用，支持MCP和Agent两种类型"""
+        """解析JSON格式的工具调用，支持MCP和Agent两种类型"""
         tool_calls = []
-        tool_request_start = "<<<[TOOL_REQUEST]>>>"
-        tool_request_end = "<<<[END_TOOL_REQUEST]>>>"
-        start_index = 0
         call_count = 0
         
         print(f"[DEBUG] 开始解析工具调用，内容长度: {len(content)}")
         
-        while True:
-            start_pos = content.find(tool_request_start, start_index)
-            if start_pos == -1:
-                break
-            end_pos = content.find(tool_request_end, start_pos)
-            if end_pos == -1:
-                start_index = start_pos + len(tool_request_start)
-                continue
-                
+        # 查找所有JSON对象
+        import json
+        import re
+        
+        # 匹配JSON对象的正则表达式
+        json_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
+        
+        for match in re.finditer(json_pattern, content):
+            json_str = match.group(0)
             call_count += 1
-            tool_content = content[start_pos + len(tool_request_start):end_pos].strip()
-            print(f"[DEBUG] 找到工具调用{call_count}，原始内容: {tool_content}")
             
-            # 先解析所有参数
-            tool_args = {}
-            param_pattern = r'(\w+)\s*:\s*「始」([\s\S]*?)「末」'
-            for match in re.finditer(param_pattern, tool_content):
-                key = match.group(1)
-                value = match.group(2).strip()
-                tool_args[key] = value
+            print(f"[DEBUG] 找到JSON对象{call_count}，原始内容: {json_str}")
             
-            print(f"[DEBUG] 工具调用{call_count}解析参数: {tool_args}")
-            
-            # 判断调用类型
-            agent_type = tool_args.get('agentType', 'mcp').lower()
-            
-            if agent_type == 'agent':
-                # Agent类型调用格式
-                agent_name = tool_args.get('agent_name')
-                query = tool_args.get('query')
-                if agent_name and query:
-                    tool_call = {
-                        'name': 'agent_call',
-                        'args': {
-                            'agentType': 'agent',
-                            'agent_name': agent_name,
-                            'query': query
-                        }
-                    }
-                    tool_calls.append(tool_call)
-                    print(f"[DEBUG] 解析为Agent调用: {tool_call}")
-            else:
-                # MCP类型调用格式（包括默认mcp和旧格式）
-                tool_name = tool_args.get('tool_name')
-                if tool_name:
-                    # 新格式：有service_name
-                    if 'service_name' in tool_args:
+            # 解析JSON
+            try:
+                tool_args = json.loads(json_str)
+                print(f"[DEBUG] JSON格式解析成功: {tool_args}")
+                
+                # 判断调用类型
+                agent_type = tool_args.get('agentType', 'mcp').lower()
+                
+                if agent_type == 'agent':
+                    # Agent类型调用格式
+                    agent_name = tool_args.get('agent_name')
+                    prompt = tool_args.get('prompt')
+                    if agent_name and prompt:
                         tool_call = {
-                            'name': tool_name,
-                            'args': tool_args
+                            'name': 'agent_call',
+                            'args': {
+                                'agentType': 'agent',
+                                'agent_name': agent_name,
+                                'prompt': prompt
+                            }
                         }
                         tool_calls.append(tool_call)
-                        print(f"[DEBUG] 解析为MCP调用(新格式): {tool_call}")
-                    else:
-                        # 旧格式：tool_name作为服务名
-                        service_name = tool_name
-                        tool_args['service_name'] = service_name
-                        tool_args['agentType'] = 'mcp'
-                        tool_call = {
-                            'name': tool_name,
-                            'args': tool_args
-                        }
-                        tool_calls.append(tool_call)
-                        print(f"[DEBUG] 解析为MCP调用(旧格式): {tool_call}")
-            
-            start_index = end_pos + len(tool_request_end)
+                        print(f"[DEBUG] 解析为Agent调用: {tool_call}")
+                else:
+                    # MCP类型调用格式
+                    tool_name = tool_args.get('tool_name')
+                    if tool_name:
+                        # 新格式：有service_name
+                        if 'service_name' in tool_args:
+                            tool_call = {
+                                'name': tool_name,
+                                'args': tool_args
+                            }
+                            tool_calls.append(tool_call)
+                            print(f"[DEBUG] 解析为MCP调用(新格式): {tool_call}")
+                        else:
+                            # 旧格式：tool_name作为服务名
+                            service_name = tool_name
+                            tool_args['service_name'] = service_name
+                            tool_args['agentType'] = 'mcp'
+                            tool_call = {
+                                'name': tool_name,
+                                'args': tool_args
+                            }
+                            tool_calls.append(tool_call)
+                            print(f"[DEBUG] 解析为MCP调用(旧格式): {tool_call}")
+                            
+            except json.JSONDecodeError as e:
+                print(f"[DEBUG] JSON解析失败: {e}")
+                continue
         
         print(f"[DEBUG] 工具调用解析完成，共解析到 {len(tool_calls)} 个调用")
         return tool_calls
@@ -299,15 +297,15 @@ class NagaConversation: # 对话主类
                         agent_manager = get_agent_manager()
                         
                         agent_name = args.get('agent_name')
-                        query = args.get('query')
+                        prompt = args.get('prompt')
                         
-                        print(f"[DEBUG] Agent调用: {agent_name}, query: {query}")
+                        print(f"[DEBUG] Agent调用: {agent_name}, prompt: {prompt}")
                         
-                        if not agent_name or not query:
-                            result = "Agent调用失败: 缺少agent_name或query参数"
+                        if not agent_name or not prompt:
+                            result = "Agent调用失败: 缺少agent_name或prompt参数"
                         else:
                             # 直接调用Agent
-                            result = await agent_manager.call_agent(agent_name, query)
+                            result = await agent_manager.call_agent(agent_name, prompt)
                             if result.get("status") == "success":
                                 result = result.get("result", "")
                             else:
@@ -440,18 +438,20 @@ class NagaConversation: # 对话主类
                                 if key != 'tool_name':
                                     # 特殊处理city参数，注入本地城市信息
                                     if key == 'city' and name == 'WeatherTimeAgent':
-                                        params.append(f"{key}: 「始」{local_city}「末」")
+                                        params.append(f"{key}: {local_city}")
                                     else:
-                                        params.append(f"{key}: 「始」{value}「末」")
+                                        params.append(f"{key}: {value}")
                             
                             # 构建调用格式
-                            format_str = f"  {tool_name}: <<<[TOOL_REQUEST]>>>\n"
-                            format_str += f"    agentType: 「始」mcp「末」\n"
-                            format_str += f"    service_name: 「始」{name}「末」\n"
-                            format_str += f"    tool_name: 「始」{tool_name}「末」\n"
+                            format_str = f"  {tool_name}:\n"
+                            format_str += f"    {{\n"
+                            format_str += f"      \"agentType\": \"mcp\",\n"
+                            format_str += f"      \"service_name\": \"{name}\",\n"
+                            format_str += f"      \"tool_name\": \"{tool_name}\",\n"
                             for param in params:
-                                format_str += f"    {param}\n"
-                            format_str += f"    <<<[END_TOOL_REQUEST]>>>"
+                                key, value = param.split(": ", 1)
+                                format_str += f"      \"{key}\": \"{value}\",\n"
+                            format_str += f"    }}"
                             
                             mcp_list.append(format_str)
                         except:
@@ -517,7 +517,8 @@ class NagaConversation: # 对话主类
             if is_voice_input:
                 print(f"开始处理用户输入：{now()}")  # 语音转文本结束，开始处理
             
-            # 记忆MCP查询
+            # 完全禁用GRAG记忆查询
+            # GRAG记忆查询
             # memory_context = ""
             # if self.memory_manager:
             #     try:
@@ -527,21 +528,8 @@ class NagaConversation: # 对话主类
             #             logger.info("从GRAG记忆中检索到相关信息")
             #     except Exception as e:
             #         logger.error(f"GRAG记忆查询失败: {e}")
-            # 新版：通过MCP服务调用记忆系统
-            # 可选：如需在prompt前先查记忆，可在此处调用
-            # try:
-            #     memory_result = await self.mcp.unified_call(
-            #         service_name="MemoryAgent",
-            #         tool_name="recall",
-            #         args={"query": u}
-            #     )
-            #     if memory_result and isinstance(memory_result, str):
-            #         logger.info(f"[MCP记忆] {memory_result}")
-            # except Exception as e:
-            #     logger.error(f"MCP记忆查询失败: {e}")
             
-            # 添加handoff提示词
-            system_prompt = f"{RECOMMENDED_PROMPT_PREFIX}\n{config.prompts.naga_system_prompt}"
+            system_prompt = config.prompts.naga_system_prompt
             
             # 获取过滤后的服务列表
             available_services = self.mcp.get_available_services_filtered()

@@ -55,7 +55,7 @@ if not API_KEY:
 if not BASE_URL:
     raise ValueError("BASE_URL 未在config.json或环境变量中设置")
 if not MODEL_NAME:
-    MODEL_NAME = "deepseek-chat"
+  MODEL_NAME = "deepseek-chat"
 
 
 client = AsyncOpenAI(

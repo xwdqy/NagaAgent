@@ -110,7 +110,7 @@ fi
 
 # 安装 playwright 浏览器驱动
 print_info "安装 playwright 浏览器驱动..."
-python -m playwright install msedge
+python -m playwright install chromium
 
 # 验证 playwright 安装
 print_info "验证 playwright 安装..."

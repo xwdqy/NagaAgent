@@ -53,14 +53,28 @@ class SystemControlAgent(Agent):
             keyboard.on_press(on_key_press)
             
             time_str = f"{time_sec}秒后" if time_sec > 0 else "立即"
-            # 追加：通过MCP返回message字段给前端
-            msg = f"请在10秒内按 y 键（确认关机）或 n 键（取消），否则自动取消。确认要{time_str}关机吗？(按y/n键): "
-            print(f"【系统控制】{msg}")
-            return json.dumps({
-                "status": "pending",
-                "message": msg,
-                "data": {}
-            }, ensure_ascii=False)
+            print(f"【系统控制】请在10秒内按 y 键（确认关机）或 n 键（取消），否则自动取消。")
+            print(f"确认要{time_str}关机吗？(按y/n键): ")
+            
+            # 等待10秒或按键
+            start_time = time_module.time()
+            while time_module.time() - start_time < 10:
+                if result["key_pressed"] is not None:
+                    break
+                time_module.sleep(0.1)
+            
+            # 停止监听
+            keyboard.unhook_all()
+            
+            if result["key_pressed"] is None:
+                return json.dumps({"status": "cancelled", "message": "10秒未按键，关机已自动取消", "data": {}}, ensure_ascii=False)
+            
+            if result["confirmed"]:
+                import os
+                os.system(f"shutdown /s /t {time_sec}")
+                return json.dumps({"status": "success", "message": f"关机已确认，{time_sec}秒后关机", "data": {}}, ensure_ascii=False)
+            else:
+                return json.dumps({"status": "cancelled", "message": "关机已取消", "data": {}}, ensure_ascii=False)
         elif action == "restart":
             time_sec = int(data.get("time", 0))
             import keyboard

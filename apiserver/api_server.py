@@ -65,21 +65,21 @@ async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     global naga_agent
     try:
-        print("[INFO] 正在初始化NagaAgent...")
+        print("🚀 正在初始化NagaAgent...")
         naga_agent = NagaConversation()  # 第四次初始化：API服务器启动时创建
-        print("[INFO] NagaAgent初始化完成")
+        print("✅ NagaAgent初始化完成")
         yield
     except Exception as e:
-        print(f"[ERROR] NagaAgent初始化失败: {e}")
+        print(f"❌ NagaAgent初始化失败: {e}")
         traceback.print_exc()
         sys.exit(1)
     finally:
-        print("[INFO] 正在清理资源...")
+        print("🔄 正在清理资源...")
         if naga_agent and hasattr(naga_agent, 'mcp'):
             try:
                 await naga_agent.mcp.cleanup()
             except Exception as e:
-                print(f"[WARNING] 清理MCP资源时出错: {e}")
+                print(f"⚠️ 清理MCP资源时出错: {e}")
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -482,68 +482,65 @@ async def get_memory_stats():
 
 # 工具调用循环相关函数
 
-def parse_tool_calls(content: str) -> list:
-    """解析TOOL_REQUEST格式的工具调用，支持MCP和Agent两种类型"""
-    tool_calls = []
-    tool_request_start = "<<<[TOOL_REQUEST]>>>"
-    tool_request_end = "<<<[END_TOOL_REQUEST]>>>"
-    start_index = 0
-    while True:
-        start_pos = content.find(tool_request_start, start_index)
-        if start_pos == -1:
-            break
-        end_pos = content.find(tool_request_end, start_pos)
-        if end_pos == -1:
-            start_index = start_pos + len(tool_request_start)
-            continue
-        tool_content = content[start_pos + len(tool_request_start):end_pos].strip()
+class ConnectionManager:
+    def parse_tool_calls(self, content: str) -> list:
+        """解析JSON格式的工具调用"""
+        tool_calls = []
         
-        # 先解析所有参数
-        tool_args = {}
-        param_pattern = r'(\w+)\s*:\s*「始」([\s\S]*?)「末」'
-        for match in re.finditer(param_pattern, tool_content):
-            key = match.group(1)
-            value = match.group(2).strip()
-            tool_args[key] = value
+        # 查找所有JSON对象
+        import json
+        import re
         
-        # 判断调用类型
-        agent_type = tool_args.get('agentType', 'mcp').lower()
+        # 匹配JSON对象的正则表达式
+        json_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
         
-        if agent_type == 'agent':
-            # Agent类型调用格式
-            agent_name = tool_args.get('agent_name')
-            query = tool_args.get('query')
-            if agent_name and query:
-                tool_calls.append({
-                    'name': 'agent_call',
-                    'args': {
-                        'agentType': 'agent',
-                        'agent_name': agent_name,
-                        'query': query
-                    }
-                })
-            else:
-            # MCP类型调用格式（包括默认mcp和旧格式）
-                tool_name = tool_args.get('tool_name')
-        if tool_name:
-                # 新格式：有service_name
-                if 'service_name' in tool_args:
-                    tool_calls.append({
-                        'name': tool_name,
-                        'args': tool_args
-                    })
+        for match in re.finditer(json_pattern, content):
+            json_str = match.group(0)
+            
+            # 解析JSON
+            try:
+                tool_args = json.loads(json_str)
+                
+                # 判断调用类型
+                agent_type = tool_args.get('agentType', 'mcp').lower()
+                
+                if agent_type == 'agent':
+                    # Agent类型调用格式
+                    agent_name = tool_args.get('agent_name')
+                    prompt = tool_args.get('prompt')
+                    if agent_name and prompt:
+                        tool_calls.append({
+                            'name': 'agent_call',
+                            'args': {
+                                'agentType': 'agent',
+                                'agent_name': agent_name,
+                                'prompt': prompt
+                            }
+                        })
                 else:
-                    # 旧格式：tool_name作为服务名
-                    service_name = tool_name
-                    tool_args['service_name'] = service_name
-                    tool_args['agentType'] = 'mcp'
-                    tool_calls.append({
-                        'name': tool_name,
-                        'args': tool_args
-                    })
+                    # MCP类型调用格式
+                    tool_name = tool_args.get('tool_name')
+                    if tool_name:
+                        # 新格式：有service_name
+                        if 'service_name' in tool_args:
+                            tool_calls.append({
+                                'name': tool_name,
+                                'args': tool_args
+                            })
+                        else:
+                            # 旧格式：tool_name作为服务名
+                            service_name = tool_name
+                            tool_args['service_name'] = service_name
+                            tool_args['agentType'] = 'mcp'
+                            tool_calls.append({
+                                'name': tool_name,
+                                'args': tool_args
+                            })
+                            
+            except json.JSONDecodeError:
+                continue
         
-        start_index = end_pos + len(tool_request_end)
-    return tool_calls
+        return tool_calls
 
 async def execute_tool_calls(tool_calls: list, mcp_manager) -> str:
     """执行工具调用"""
@@ -562,13 +559,13 @@ async def execute_tool_calls(tool_calls: list, mcp_manager) -> str:
                     agent_manager = get_agent_manager()
                     
                     agent_name = args.get('agent_name')
-                    query = args.get('query')
+                    prompt = args.get('prompt')
                     
-                    if not agent_name or not query:
-                        result = "Agent调用失败: 缺少agent_name或query参数"
+                    if not agent_name or not prompt:
+                        result = "Agent调用失败: 缺少agent_name或prompt参数"
                     else:
                         # 直接调用Agent
-                        result = await agent_manager.call_agent(agent_name, query)
+                        result = await agent_manager.call_agent(agent_name, prompt)
                         if result.get("status") == "success":
                             result = result.get("result", "")
                         else:
@@ -580,12 +577,12 @@ async def execute_tool_calls(tool_calls: list, mcp_manager) -> str:
             else:
                 # MCP类型：走handoff流程
                 service_name = args.get('service_name', tool_name)
-            result = await mcp_manager.handoff(
-                    service_name=service_name,
-                    task=args
-            )
-            
-            results.append(f"来自工具 \"{tool_name}\" 的结果:\n{result}")
+                result = await mcp_manager.handoff(
+                        service_name=service_name,
+                        task=args
+                )
+                
+                results.append(f"来自工具 \"{tool_name}\" 的结果:\n{result}")
         except Exception as e:
             error_result = f"执行工具 {tool_call['name']} 时发生错误：{str(e)}"
             results.append(error_result)

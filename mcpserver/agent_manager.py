@@ -1,34 +1,43 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Agent管理器 - 专注于会话管理和API调用
-使用AgentRegistry进行Agent注册和发现
+Agent管理器 - 独立的Agent注册和调用系统
+支持从配置文件动态加载Agent定义，提供统一的调用接口
 """
 
+import os
+import json
 import asyncio
 import logging
 import time
+from pathlib import Path
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
-
-# 导入AgentRegistry
-from mcpserver.agent_registry import get_agent_registry, AgentConfig
+from datetime import datetime, timedelta
+import re
 
 # 配置日志
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("AgentManager")
-logger.setLevel(logging.INFO)
-
-# 如果没有处理器，添加一个
-if not logger.handlers:
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter('%(levelname)s - %(name)s - %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
 
 # 屏蔽HTTP库的DEBUG日志
 logging.getLogger("httpcore.http11").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore.connection").setLevel(logging.WARNING)
+
+@dataclass
+class AgentConfig:
+    """Agent配置类"""
+    id: str  # 模型ID
+    name: str  # Agent名称（中文名）
+    base_name: str  # 基础名称（英文）
+    system_prompt: str  # 系统提示词
+    max_output_tokens: int = 40000  # 最大输出token数
+    temperature: float = 0.7  # 温度参数
+    description: str = ""  # 描述信息
+    model_provider: str = "openai"  # 模型提供商
+    api_base_url: str = ""  # API基础URL
+    api_key: str = ""  # API密钥
 
 @dataclass
 class AgentSession:
@@ -38,14 +47,27 @@ class AgentSession:
     session_id: str = "default_user_session"
 
 class AgentManager:
-    """Agent管理器 - 专注于会话管理和API调用"""
+    """Agent管理器"""
     
-    def __init__(self):
-        """初始化Agent管理器"""
+    def __init__(self, config_dir: str = "agent_configs"):
+        """
+        初始化Agent管理器
+        
+        Args:
+            config_dir: Agent配置文件目录
+        """
+        self.config_dir = Path(config_dir)
+        self.agents: Dict[str, AgentConfig] = {}
         self.agent_sessions: Dict[str, Dict[str, AgentSession]] = {}
         self.max_history_rounds = 7  # 最大历史轮数
         self.context_ttl_hours = 24  # 上下文TTL（小时）
         self.debug_mode = True
+        
+        # 确保配置目录存在
+        self.config_dir.mkdir(exist_ok=True)
+        
+        # 加载Agent配置
+        self._load_agent_configs()
         
         # 启动定期清理任务（只在事件循环中启动）
         try:
@@ -55,9 +77,48 @@ class AgentManager:
             # 没有运行的事件循环，跳过定期清理任务
             pass
         
-        logger.info("AgentManager初始化完成")
+        logger.info(f"AgentManager初始化完成，已加载 {len(self.agents)} 个Agent")
     
-
+    def _load_agent_configs(self):
+        """从配置文件加载Agent定义"""
+        # 扫描配置文件目录
+        config_files = list(self.config_dir.glob("*.json"))
+        
+        for config_file in config_files:
+            try:
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config_data = json.load(f)
+                
+                # 解析Agent配置
+                for agent_key, agent_data in config_data.items():
+                    if self._validate_agent_config(agent_data):
+                        agent_config = AgentConfig(
+                            id=agent_data.get('model_id', ''),
+                            name=agent_data.get('name', agent_key),
+                            base_name=agent_data.get('base_name', agent_key),
+                            system_prompt=agent_data.get('system_prompt', f'You are a helpful AI assistant named {agent_data.get("name", agent_key)}.'),
+                            max_output_tokens=agent_data.get('max_output_tokens', 40000),
+                            temperature=agent_data.get('temperature', 0.7),
+                            description=agent_data.get('description', f'Assistant {agent_data.get("name", agent_key)}.'),
+                            model_provider=agent_data.get('model_provider', 'openai'),
+                            api_base_url=agent_data.get('api_base_url', ''),
+                            api_key=agent_data.get('api_key', '')
+                        )
+                        
+                        self.agents[agent_key] = agent_config
+                        logger.info(f"已加载Agent: {agent_key} ({agent_config.name})")
+                
+            except Exception as e:
+                logger.error(f"加载配置文件 {config_file} 失败: {e}")
+    
+    def _validate_agent_config(self, config: Dict[str, Any]) -> bool:
+        """验证Agent配置"""
+        required_fields = ['model_id', 'name']
+        for field in required_fields:
+            if field not in config or not config[field]:
+                logger.warning(f"Agent配置缺少必需字段: {field}")
+                return False
+        return True
     
     def get_agent_session_history(self, agent_name: str, session_id: str = 'default_user_session') -> List[Dict[str, str]]:
         """获取Agent会话历史"""
@@ -207,28 +268,24 @@ class AgentManager:
         
         return True
 
-    async def call_agent(self, agent_name: str, query: str, session_id: str = None) -> Dict[str, Any]:
+    async def call_agent(self, agent_name: str, prompt: str, session_id: str = None) -> Dict[str, Any]:
         """
         调用指定的Agent
         
         Args:
             agent_name: Agent名称
-            query: 任务内容
+            prompt: 用户提示词
             session_id: 会话ID
             
         Returns:
             Dict[str, Any]: 调用结果
         """
-        # 从AgentRegistry获取Agent配置
-        registry = get_agent_registry()
-        agent_config = registry.get_agent_config(agent_name)
-        
-        if not agent_config:
-            available_agents = registry.get_available_agents()
-            agent_names = [agent["base_name"] for agent in available_agents]
+        # 检查Agent是否存在
+        if agent_name not in self.agents:
+            available_agents = list(self.agents.keys())
             error_msg = f"请求的Agent '{agent_name}' 未找到或未正确配置。"
-            if agent_names:
-                error_msg += f" 当前已加载的Agent有: {', '.join(agent_names)}。"
+            if available_agents:
+                error_msg += f" 当前已加载的Agent有: {', '.join(available_agents)}。"
             else:
                 error_msg += " 当前没有加载任何Agent。请检查配置文件。"
             error_msg += " 请确认您请求的Agent名称是否准确。"
@@ -236,45 +293,13 @@ class AgentManager:
             logger.error(f"Agent调用失败: {error_msg}")
             return {"status": "error", "error": error_msg}
         
+        agent_config = self.agents[agent_name]
+        
         # 生成会话ID
         if not session_id:
             session_id = f"agent_{agent_config.base_name}_default_user_session"
         
         try:
-            # 检查是否有自定义执行方法
-            if hasattr(agent_config, 'execution_method') and agent_config.execution_method:
-                logger.info(f"使用自定义执行方法: {agent_name}")
-                try:
-                    # 动态导入模块和函数
-                    module_name = agent_config.execution_method.get('module')
-                    function_name = agent_config.execution_method.get('function')
-                    
-                    if not module_name or not function_name:
-                        raise ValueError("executionMethod配置不完整")
-                    
-                    # 导入模块
-                    module = __import__(module_name, fromlist=[function_name])
-                    # 获取函数
-                    execution_function = getattr(module, function_name)
-                    
-                    # 调用函数
-                    result = await execution_function(query)
-                    return {"status": "success", "result": result}
-                    
-                except ImportError as e:
-                    error_msg = f"无法导入模块 {module_name}: {e}"
-                    logger.error(f"自定义执行方法调用失败: {error_msg}")
-                    return {"status": "error", "error": error_msg}
-                except AttributeError as e:
-                    error_msg = f"无法找到函数 {function_name}: {e}"
-                    logger.error(f"自定义执行方法调用失败: {error_msg}")
-                    return {"status": "error", "error": error_msg}
-                except Exception as e:
-                    error_msg = f"自定义执行方法执行失败: {e}"
-                    logger.error(f"自定义执行方法调用失败: {error_msg}")
-                    return {"status": "error", "error": error_msg}
-            
-            # 标准Agent处理：使用LLM API
             # 获取会话历史
             history = self.get_agent_session_history(agent_name, session_id)
             
@@ -289,7 +314,7 @@ class AgentManager:
             messages.extend(history)
             
             # 3. 当前用户输入：本次要处理的任务内容
-            user_message = self._build_user_message(query, agent_config)
+            user_message = self._build_user_message(prompt, agent_config)
             messages.append(user_message)
             
             # 验证消息序列
@@ -391,9 +416,132 @@ class AgentManager:
             
             return {"status": "error", "error": error_msg}
     
-
+    def get_available_agents(self) -> List[Dict[str, Any]]:
+        """获取所有可用的Agent列表"""
+        return [
+            {
+                "name": agent_config.name,
+                "base_name": agent_config.base_name,
+                "description": agent_config.description,
+                "model_id": agent_config.id,
+                "temperature": agent_config.temperature,
+                "max_output_tokens": agent_config.max_output_tokens
+            }
+            for agent_config in self.agents.values()
+        ]
     
-
+    def get_agent_info(self, agent_name: str) -> Optional[Dict[str, Any]]:
+        """获取指定Agent的详细信息"""
+        if agent_name not in self.agents:
+            return None
+        
+        agent_config = self.agents[agent_name]
+        return {
+            "name": agent_config.name,
+            "base_name": agent_config.base_name,
+            "description": agent_config.description,
+            "model_id": agent_config.id,
+            "temperature": agent_config.temperature,
+            "max_output_tokens": agent_config.max_output_tokens,
+            "system_prompt": agent_config.system_prompt,
+            "model_provider": agent_config.model_provider
+        }
+    
+    def reload_configs(self):
+        """重新加载Agent配置"""
+        self.agents.clear()
+        self._load_agent_configs()
+        logger.info("Agent配置已重新加载")
+    
+    def _register_agent_from_manifest(self, agent_name: str, agent_config: Dict[str, Any]):
+        """从manifest注册Agent
+        
+        Args:
+            agent_name: Agent名称
+            agent_config: Agent配置字典
+        """
+        try:
+            # 验证配置
+            if not self._validate_agent_config(agent_config):
+                logger.warning(f"Agent配置验证失败: {agent_name}")
+                return False
+            
+            # 创建AgentConfig对象
+            agent_config_obj = AgentConfig(
+                id=agent_config.get('model_id', ''),
+                name=agent_config.get('name', agent_name),
+                base_name=agent_config.get('base_name', agent_name),
+                system_prompt=agent_config.get('system_prompt', f'You are a helpful AI assistant named {agent_config.get("name", agent_name)}.'),
+                max_output_tokens=agent_config.get('max_output_tokens', 8192),
+                temperature=agent_config.get('temperature', 0.7),
+                description=agent_config.get('description', f'Assistant {agent_config.get("name", agent_name)}.'),
+                model_provider=agent_config.get('model_provider', 'openai'),
+                api_base_url=agent_config.get('api_base_url', ''),
+                api_key=agent_config.get('api_key', '')
+            )
+            
+            # 注册到agents字典
+            self.agents[agent_name] = agent_config_obj
+            logger.info(f"已从manifest注册Agent: {agent_name} ({agent_config_obj.name})")
+            return True
+            
+        except Exception as e:
+            logger.error(f"从manifest注册Agent失败 {agent_name}: {e}")
+            return False
+    
+    async def call_agent_by_action(self, agent_name: str, action_args: Dict[str, Any]) -> str:
+        """根据动作调用Agent
+        
+        Args:
+            agent_name: Agent名称
+            action_args: 动作参数，包含action和具体参数
+            
+        Returns:
+            str: Agent执行结果
+        """
+        try:
+            # 检查Agent是否存在
+            if agent_name not in self.agents:
+                return f"Agent '{agent_name}' 未找到或未正确配置"
+            
+            agent_config = self.agents[agent_name]
+            action = action_args.get('action', '')
+            
+            # 构建用户提示词
+            user_prompt = self._build_action_prompt(action, action_args)
+            
+            # 调用Agent
+            result = await self.call_agent(agent_name, user_prompt)
+            
+            if result.get("status") == "success":
+                return result.get("result", "")
+            else:
+                return f"Agent调用失败: {result.get('error', '未知错误')}"
+                
+        except Exception as e:
+            logger.error(f"Agent动作调用失败 {agent_name}: {e}")
+            return f"Agent动作调用异常: {str(e)}"
+    
+    def _build_action_prompt(self, action: str, action_args: Dict[str, Any]) -> str:
+        """构建动作提示词
+        
+        Args:
+            action: 动作名称
+            action_args: 动作参数
+            
+        Returns:
+            str: 构建的提示词
+        """
+        # 移除不需要的参数
+        clean_args = {k: v for k, v in action_args.items() 
+                     if k not in ['service_name', 'action']}
+        
+        # 构建提示词
+        if clean_args:
+            args_str = ", ".join([f"{k}: {v}" for k, v in clean_args.items()])
+            return f"请执行动作 '{action}'，参数: {args_str}"
+        else:
+            return f"请执行动作 '{action}'"
 
 # 全局Agent管理器实例
 _AGENT_MANAGER = None
@@ -406,17 +554,17 @@ def get_agent_manager() -> AgentManager:
     return _AGENT_MANAGER
 
 # 便捷函数
-async def call_agent(agent_name: str, query: str, session_id: str = None) -> Dict[str, Any]:
+async def call_agent(agent_name: str, prompt: str, session_id: str = None) -> Dict[str, Any]:
     """便捷的Agent调用函数"""
     manager = get_agent_manager()
-    return await manager.call_agent(agent_name, query, session_id)
+    return await manager.call_agent(agent_name, prompt, session_id)
 
 def list_agents() -> List[Dict[str, Any]]:
     """便捷的Agent列表获取函数"""
-    from mcpserver.agent_registry import list_agents as registry_list_agents
-    return registry_list_agents()
+    manager = get_agent_manager()
+    return manager.get_available_agents()
 
 def get_agent_info(agent_name: str) -> Optional[Dict[str, Any]]:
     """便捷的Agent信息获取函数"""
-    from mcpserver.agent_registry import get_agent_info as registry_get_agent_info
-    return registry_get_agent_info(agent_name) 
+    manager = get_agent_manager()
+    return manager.get_agent_info(agent_name) 

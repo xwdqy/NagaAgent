@@ -1,15 +1,15 @@
 {
   "system": {
     "version": "3.0",
-    "voice_enabled": true,
+    "voice_enabled": false,
     "stream_mode": true,
-    "debug": false,
-    "log_level": "WARNING"
+    "debug": true,
+    "log_level": "DEBUG"
   },
   "api": {
-    "api_key": "your_api_key_here",
-    "base_url": "https://api.deepseek.com/v1",
-    "model": "deepseek-chat",
+    "api_key": " ",
+    "base_url": "https://phapi.furina.junmatec.cn/v1",
+    "model": "TIG-3.6-VL-Lite",
     "temperature": 0.7,
     "max_tokens": 2000,
     "max_history_rounds": 10
@@ -22,13 +22,13 @@
     "docs_enabled": true
   },
   "grag": {
-    "enabled": false,
-    "auto_extract": false,
+    "enabled": true,
+    "auto_extract": true,
     "context_length": 5,
     "similarity_threshold": 0.6,
-    "neo4j_uri": "",
+    "neo4j_uri": "neo4j://127.0.0.1:7687",
     "neo4j_user": "neo4j",
-    "neo4j_password": "",
+    "neo4j_password": " ",
     "neo4j_database": "neo4j"
   },
   "handoff": {
@@ -36,106 +36,41 @@
     "max_loop_non_stream": 5,
     "show_output": false
   },
-  "mcp": {
-    "agent_tool_name": "agent",
-    "agent_priority": true,
-    "auto_discover_agents": true,
-    "auto_discover_mcp": true,
-    "exclude_agent_tools_from_mcp": true
-  },
   "browser": {
-    "path": null,
-    "playwright_headless": false,
-    "edge_lnk_path": "C:\\Users\\DREEM\\Desktop\\Microsoft Edge.lnk",
-    "edge_common_paths": [
-      "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-      "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-      "C:\\Users\\DREEM\\AppData\\Local\\Microsoft\\Edge\\Application\\msedge.exe"
-    ]
+    "playwright_headless": false
   },
   "tts": {
-    "api_key": "your_api_key_here",
-    "port": 5051,
-    "default_voice": "zh-CN-XiaoxiaoNeural",
+    "api_key": "your_tts_api_key_here",
+    "port": 5050,
+    "default_voice": "en-US-AvaNeural",
     "default_format": "mp3",
     "default_speed": 1.0,
-    "default_language": "zh-CN",
+    "default_language": "en-US",
     "remove_filter": false,
     "expand_api": true,
-    "require_api_key": false,
-    "provider": "edgetts",
-    "group_id": "your_minimax_group_id_here",
-    "tts_model": "speech-02-hd",
-    "emotion": "neutral"
-  },
-  "weather": {
-    "api_key": "your_weather_api_key_here",
-    "enabled": true,
-    "default_city": "",
-    "cache_duration": 1800
-  },
-  "mqtt": {
-    "enabled": false,
-    "broker": "broker.emqx.io",
-    "port": 1883,
-    "topic": "device/switch",
-    "client_id": "mcp_device_switch",
-    "username": "",
-    "password": ""
+    "require_api_key": true
   },
   "quick_model": {
-    "enabled": false,
-    "api_key": "",
-    "base_url": "",
-    "model_name": "qwen2.5-1.5b-instruct",
+    "enabled": true,
+    "api_key": " ",
+    "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+    "model_name": "doubao-seed-1-6-flash-250615",
     "max_tokens": 512,
     "temperature": 0.05,
     "timeout": 5,
-    "max_retries": 2,
-    "quick_decision_enabled": false,
-    "json_format_enabled": false,
-    "output_filter_enabled": false,
-    "difficulty_judgment_enabled": false,
-    "scoring_system_enabled": false,
-    "thinking_completeness_enabled": false
+    "max_retries": 2
   },
-  "filter": {
-    "filter_think_tags": true,
-    "filter_patterns": [
-      "<think>.*?</think>",
-      "<thinking>.*?</thinking>",
-      "<reflection>.*?</reflection>",
-      "<internal>.*?</internal>"
-    ],
-    "clean_output": true
-  },
-  "difficulty": {
-    "enabled": false,
-    "use_small_model": false,
-    "difficulty_levels": ["简单", "中等", "困难", "极难"],
-    "factors": ["概念复杂度", "推理深度", "知识广度", "计算复杂度", "创新要求"],
-    "threshold_simple": 2,
-    "threshold_medium": 4,
-    "threshold_hard": 6
-  },
-  "scoring": {
-    "enabled": false,
-    "score_range": [1, 5],
-    "score_threshold": 2,
-    "similarity_threshold": 0.85,
-    "max_user_preferences": 3,
-    "default_preferences": ["逻辑清晰准确", "实用性强", "创新思维"],
-    "penalty_for_similar": 1,
-    "min_results_required": 2,
-    "strict_filtering": true
-  },
-  "thinking": {
-    "enabled": false,
-    "use_small_model": false,
-    "completeness_criteria": ["问题分析充分", "解决方案明确", "逻辑链条完整", "结论清晰合理"],
-    "completeness_threshold": 0.8,
-    "max_thinking_depth": 5,
-    "next_question_generation": false
+  "weather_api_key": " ",
+  "mqtt": {
+    "enabled": true,
+    "broker": "iot-06z00b3k4pfqzty.mqtt.iothub.aliyuncs.com",
+    "port": 1883,
+    "topic": " ",
+    "client_id": " ",
+    "username": " ",
+    "password": " ",
+    "keepalive": 60,
+    "qos": 1
   },
   "ui": {
     "user_name": "用户",

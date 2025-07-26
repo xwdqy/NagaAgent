@@ -73,36 +73,38 @@ def scan_and_register_mcp_agents(mcp_dir: str = 'mcpserver') -> list:
                     sys.stderr.write(f"✅ 已注册MCP Agent: {agent_name}\n")
                     
             elif agent_type == 'agent':
-                # Agent类型：转交给AgentRegistry处理
+                # Agent类型：转交给AgentManager处理
                 try:
-                    from mcpserver.agent_registry import get_agent_registry
-                    agent_registry = get_agent_registry()
+                    from mcpserver.agent_manager import get_agent_manager
+                    agent_manager = get_agent_manager()
                     
-                    # 注册到AgentRegistry
-                    success = agent_registry.register_agent_from_manifest(agent_name, manifest)
-                    if success:
-                        registered_agents.append(f"agent:{agent_name}")
-                    else:
-                        sys.stderr.write(f"❌ Agent注册失败: {agent_name}\n")
+                    # 从manifest构建Agent配置
+                    agent_config = {
+                        'model_id': manifest.get('modelId', 'deepseek-chat'),
+                        'name': manifest.get('displayName', agent_name),
+                        'base_name': agent_name,
+                        'system_prompt': manifest.get('systemPrompt', f'You are a helpful AI assistant named {manifest.get("displayName", agent_name)}.'),
+                        'max_output_tokens': manifest.get('maxOutputTokens', 8192),
+                        'temperature': manifest.get('temperature', 0.7),
+                        'description': manifest.get('description', f'Assistant {manifest.get("displayName", agent_name)}.'),
+                        'model_provider': manifest.get('modelProvider', 'openai'),
+                        'api_base_url': manifest.get('apiBaseUrl', ''),
+                        'api_key': manifest.get('apiKey', '')
+                    }
+                    
+                    # 注册到AgentManager
+                    agent_manager._register_agent_from_manifest(agent_name, agent_config)
+                    registered_agents.append(f"agent:{agent_name}")
+                    sys.stderr.write(f"✅ 已注册Agent到AgentManager: {agent_name}\n")
                     
                 except Exception as e:
-                    sys.stderr.write(f"注册Agent到AgentRegistry失败 {agent_name}: {e}\n")
+                    sys.stderr.write(f"注册Agent到AgentManager失败 {agent_name}: {e}\n")
                     continue
                     
         except Exception as e:
             sys.stderr.write(f"处理manifest文件失败 {manifest_file}: {e}\n")
             continue
     
-    # 汇总打印
-    print("\n=== 注册汇总 ===")
-    print(f"已注册MCP服务: {list(MCP_REGISTRY.keys())}")
-    try:
-        from mcpserver.agent_registry import get_agent_registry
-        agent_registry = get_agent_registry()
-        print(f"已注册Agent服务: {list(agent_registry.get_all_agents().keys())}")
-    except Exception as e:
-        print(f"已注册Agent服务: 获取失败: {e}")
-    print("=== 注册汇总结束 ===\n")
     return registered_agents
 
 def get_service_info(service_name: str) -> Optional[Dict[str, Any]]:
@@ -216,7 +218,6 @@ def auto_register_mcp():
     sys.stderr.write(f"MCP注册完成，共注册 {len(registered)} 个服务: {registered}\n")
     return registered
 
-# 执行自动注册（只在直接运行时执行）
-if __name__ == "__main__":
-    auto_register_mcp()
+# 执行自动注册
+auto_register_mcp()
 

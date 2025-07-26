@@ -409,22 +409,10 @@ class ChatWindow(QWidget):
                 s.on_send();return True
         return False
     def add_user_message(s, name, content):
-        # 改进换行符处理，确保所有类型的换行符都能正确显示
+        # 先把\n转成\n，再把\n转成<br>，适配所有换行
         from ui.response_utils import extract_message
         msg = extract_message(content)
-        
-        # 更全面的换行符处理
-        content_text = str(msg)
-        # 处理各种可能的换行符格式
-        content_text = content_text.replace('\\n', '\n')  # JSON转义的换行符
-        content_text = content_text.replace('\\r\\n', '\n')  # Windows换行符
-        content_text = content_text.replace('\\r', '\n')  # 旧版Mac换行符
-        content_text = content_text.replace('\r\n', '\n')  # 实际Windows换行符
-        content_text = content_text.replace('\r', '\n')  # 实际旧版Mac换行符
-        
-        # 转换为HTML，保持段落结构
-        content_html = content_text.replace('\n', '<br>')
-        
+        content_html = str(msg).replace('\\n', '\n').replace('\n', '<br>')
         s.text.append(f"<span style='color:#fff;font-size:12pt;font-family:Lucida Console;'>{name}</span>")
         s.text.append(f"<span style='color:#fff;font-size:16pt;font-family:Lucida Console;'>{content_html}</span>")
     def on_send(s):

@@ -217,32 +217,13 @@ class TTSConfig(BaseModel):
     """TTS服务配置"""
     api_key: str = Field(default="your_api_key_here", description="TTS服务API密钥")
     port: int = Field(default=5050, ge=1, le=65535, description="TTS服务端口")
-    default_voice: str = Field(default="zh-CN-XiaoxiaoNeural", description="默认语音")
+    default_voice: str = Field(default="en-US-AvaNeural", description="默认语音")
     default_format: str = Field(default="mp3", description="默认音频格式")
     default_speed: float = Field(default=1.0, ge=0.1, le=3.0, description="默认语速")
-    default_language: str = Field(default="zh-CN", description="默认语言")
+    default_language: str = Field(default="en-US", description="默认语言")
     remove_filter: bool = Field(default=False, description="是否移除过滤")
     expand_api: bool = Field(default=True, description="是否扩展API")
     require_api_key: bool = Field(default=True, description="是否需要API密钥")
-
-
-class WeatherConfig(BaseModel):
-    """天气服务配置"""
-    api_key: str = Field(default="your_weather_api_key_here", description="高德地图天气API密钥")
-    enabled: bool = Field(default=True, description="是否启用天气查询功能")
-    default_city: str = Field(default="", description="默认查询城市")
-    cache_duration: int = Field(default=1800, ge=60, le=3600, description="天气数据缓存时间（秒）")
-
-
-class MQTTConfig(BaseModel):
-    """MQTT设备控制配置"""
-    enabled: bool = Field(default=False, description="是否启用MQTT功能")
-    broker: str = Field(default="broker.emqx.io", description="MQTT服务器地址")
-    port: int = Field(default=1883, ge=1, le=65535, description="MQTT服务器端口")
-    topic: str = Field(default="device/switch", description="设备控制主题")
-    client_id: str = Field(default="mcp_device_switch", description="MQTT客户端ID")
-    username: str = Field(default="", description="MQTT用户名（可选）")
-    password: str = Field(default="", description="MQTT密码（可选）")
 
 
 class QuickModelConfig(BaseModel):
@@ -326,6 +307,19 @@ class ThinkingConfig(BaseModel):
     next_question_generation: bool = Field(default=False, description="生成下一级问题")  # 关闭下一级问题生成
 
 
+class MQTTConfig(BaseModel):
+    """MQTT配置"""
+    enabled: bool = Field(default=False, description="是否启用MQTT功能")
+    broker: str = Field(default="localhost", description="MQTT代理服务器地址")
+    port: int = Field(default=1883, ge=1, le=65535, description="MQTT代理服务器端口")
+    topic: str = Field(default="/test/topic", description="MQTT主题")
+    client_id: str = Field(default="naga_mqtt_client", description="MQTT客户端ID")
+    username: str = Field(default="", description="MQTT用户名")
+    password: str = Field(default="", description="MQTT密码")
+    keepalive: int = Field(default=60, ge=1, le=3600, description="保持连接时间（秒）")
+    qos: int = Field(default=1, ge=0, le=2, description="服务质量等级")
+
+
 class UIConfig(BaseModel):
     """用户界面配置"""
     user_name: str = Field(default="用户", description="默认用户名")
@@ -361,22 +355,22 @@ class SystemPrompts(BaseModel):
 
 
 【工具调用格式要求】
-如需调用某个工具，直接严格输出下面的格式（可多次出现）：
+如需调用某个工具，直接严格输出下面的json格式（可多次出现）：
 
-**MCP服务调用格式：**
-<<<[TOOL_REQUEST]>>>
-agentType: 「始」mcp「末」
-service_name: 「始」MCP服务名称「末」
-tool_name: 「始」工具名称「末」
-参数名: 「始」参数值「末」
-<<<[END_TOOL_REQUEST]>>>
+MCP服务调用格式：
+{
+  "agentType": "mcp",
+  "service_name": "MCP服务名称",
+  "tool_name": "工具名称",
+  "参数名": "参数值"
+}
 
-**Agent服务调用格式：**
-<<<[TOOL_REQUEST]>>>
-agentType: 「始」agent「末」
-agent_name: 「始」Agent名称「末」
-query: 「始」任务内容「末」
-<<<[END_TOOL_REQUEST]>>>
+Agent服务调用格式：
+{
+  "agentType": "agent",
+  "agent_name": "Agent名称",
+  "prompt": "任务内容"
+}
 
 服务类型说明：
 - agentType: "mcp" - MCP服务，使用工具调用格式
@@ -390,7 +384,7 @@ Agent服务：
 
 调用说明：
 - MCP服务：使用service_name和tool_name，支持多个参数
-- Agent服务：使用agent_name和query，query为本次任务内容
+- Agent服务：使用agent_name和prompt，prompt为本次任务内容
 - 服务名称：使用英文服务名（如AppLauncherAgent）作为service_name或agent_name
 - 当用户请求需要执行具体操作时，优先使用工具调用而不是直接回答
 
@@ -474,8 +468,6 @@ class NagaConfig(BaseModel):
     mcp: MCPConfig = Field(default_factory=MCPConfig)
     browser: BrowserConfig = Field(default_factory=BrowserConfig)
     tts: TTSConfig = Field(default_factory=TTSConfig)
-    weather: WeatherConfig = Field(default_factory=WeatherConfig)
-    mqtt: MQTTConfig = Field(default_factory=MQTTConfig)
     quick_model: QuickModelConfig = Field(default_factory=QuickModelConfig)
     filter: FilterConfig = Field(default_factory=FilterConfig)
     difficulty: DifficultyConfig = Field(default_factory=DifficultyConfig)
@@ -483,6 +475,7 @@ class NagaConfig(BaseModel):
     thinking: ThinkingConfig = Field(default_factory=ThinkingConfig)
     prompts: SystemPrompts = Field(default_factory=SystemPrompts)
     ui: UIConfig = Field(default_factory=UIConfig)
+    mqtt: MQTTConfig = Field(default_factory=MQTTConfig)
 
     class Config:
         extra = 'ignore'
@@ -639,11 +632,10 @@ TTS_DEFAULT_FORMAT = config.tts.default_format
 TTS_DEFAULT_SPEED = config.tts.default_speed
 TTS_DEFAULT_LANGUAGE = config.tts.default_language
 
-# 天气服务配置兼容性变量
-WEATHER_API_KEY = config.weather.api_key
-WEATHER_ENABLED = config.weather.enabled
-WEATHER_DEFAULT_CITY = config.weather.default_city
-WEATHER_CACHE_DURATION = config.weather.cache_duration
+QUICK_MODEL_ENABLED = config.quick_model.enabled
+QUICK_MODEL_API_KEY = config.quick_model.api_key
+QUICK_MODEL_BASE_URL = config.quick_model.base_url
+QUICK_MODEL_NAME = config.quick_model.model_name
 
 # MQTT配置兼容性变量
 MQTT_ENABLED = config.mqtt.enabled
@@ -653,11 +645,8 @@ MQTT_TOPIC = config.mqtt.topic
 MQTT_CLIENT_ID = config.mqtt.client_id
 MQTT_USERNAME = config.mqtt.username
 MQTT_PASSWORD = config.mqtt.password
-
-QUICK_MODEL_ENABLED = config.quick_model.enabled
-QUICK_MODEL_API_KEY = config.quick_model.api_key
-QUICK_MODEL_BASE_URL = config.quick_model.base_url
-QUICK_MODEL_NAME = config.quick_model.model_name
+MQTT_KEEPALIVE = config.mqtt.keepalive
+MQTT_QOS = config.mqtt.qos
 
 # 配置字典，兼容旧版本
 QUICK_MODEL_CONFIG = config.quick_model_config_dict

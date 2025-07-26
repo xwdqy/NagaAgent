@@ -32,13 +32,19 @@ class GRAGMemoryManager:
             self.enabled = False
     
     async def add_conversation_memory(self, user_input: str, ai_response: str) -> bool:
-        """添加对话记忆到知识图谱（仅写入三元组，不影响主对话历史）"""
+        """添加对话记忆到知识图谱（同时更新上下文和三元组）"""
         if not self.enabled:
             return False
         try:
-            # 只拼接本轮内容，不写入recent_context
+            # 拼接本轮内容
             conversation_text = f"用户: {user_input}\n娜迦: {ai_response}"
-            # 仅用于三元组提取和写入，不存储到self.recent_context
+            
+            # 更新recent_context（限制长度）
+            self.recent_context.append(conversation_text)
+            if len(self.recent_context) > self.context_length:
+                self.recent_context = self.recent_context[-self.context_length:]
+            
+            # 提取和存储三元组
             if self.auto_extract:
                 # 启动异步任务，不阻塞主流程
                 asyncio.create_task(self._extract_and_store_triples(conversation_text))
@@ -56,12 +62,11 @@ class GRAGMemoryManager:
                 return True
                 
             # 异步提取三元组
-            loop = asyncio.get_event_loop()
-            triples = await loop.run_in_executor(None, extract_triples, text)
+            triples = await asyncio.to_thread(extract_triples, text)
             
             if triples:
                 # 异步存储到Neo4j
-                await loop.run_in_executor(None, store_triples, triples)
+                await asyncio.to_thread(store_triples, triples)
                 self.extraction_cache.add(text_hash)
                 logger.info(f"成功提取并存储 {len(triples)} 个三元组")
                 return True
@@ -80,8 +85,7 @@ class GRAGMemoryManager:
             set_context(self.recent_context)
             
             # 异步查询
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(None, query_knowledge, question)
+            result = await asyncio.to_thread(query_knowledge, question)
             
             if result and "未在知识图谱中找到相关信息" not in result:
                 logger.info("从记忆中找到相关信息")
@@ -98,8 +102,7 @@ class GRAGMemoryManager:
             
         try:
             # 从Neo4j查询相关三元组
-            loop = asyncio.get_event_loop()
-            triples = await loop.run_in_executor(None, query_graph_by_keywords, [query])
+            triples = await asyncio.to_thread(query_graph_by_keywords, [query])
             
             # 限制返回数量
             return triples[:limit]

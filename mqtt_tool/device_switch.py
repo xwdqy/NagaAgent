@@ -208,6 +208,19 @@ class DeviceSwitchManager:
             
         if not self.connected:
             try:
+                # 阿里云IoT Hub特殊处理
+                if 'iothub.aliyuncs.com' in mqtt_config['broker']:
+                    # 阿里云IoT Hub使用用户名密码认证
+                    if mqtt_config.get('username') and mqtt_config.get('password'):
+                        self.client.username_pw_set(mqtt_config['username'], mqtt_config['password'])
+                        logger.info("使用阿里云IoT Hub用户名密码认证")
+                    else:
+                        logger.warning("阿里云IoT Hub需要用户名和密码认证")
+                else:
+                    # 其他MQTT服务器使用用户名密码认证
+                    if mqtt_config.get('username'):
+                        self.client.username_pw_set(mqtt_config['username'], mqtt_config.get('password', ''))
+                
                 self.client.connect(mqtt_config['broker'], mqtt_config['port'], 60)
                 self.client.loop_start()
                 
@@ -228,8 +241,8 @@ class DeviceSwitchManager:
                 return False
         return True
 
-    def switch_devices(self, device1: int, device2: int):
-        """控制两个设备的开关"""
+    def switch_devices(self, device1: int, device2: int, device3: int):
+        """控制三个设备的开关"""
         if not self.available:
             return False, "MQTT功能不可用"
             
@@ -241,6 +254,7 @@ class DeviceSwitchManager:
                 payload = {
                     "device1": int(device1),
                     "device2": int(device2),
+                    "device3": int(device3),
                     "timestamp": time.time()
                 }
                 
@@ -312,24 +326,24 @@ class DeviceSwitchManager:
 device_manager = DeviceSwitchManager()
 
 @mcp.tool()
-def switch_devices(device1: int, device2: int) -> dict:
-    """控制两个设备的开关"""
+def switch_devices(device1: int, device2: int, device3: int) -> dict:
+    """控制三个设备的开关"""
     try:
         if not device_manager.available:
             return {
                 "success": False,
                 "message": "MQTT功能未启用或配置缺失",
-                "data": {"device1": device1, "device2": device2}
+                "data": {"device1": device1, "device2": device2, "device3": device3}
             }
         
-        if device1 not in [0, 1] or device2 not in [0, 1]:
+        if device1 not in [0, 1] or device2 not in [0, 1] or device3 not in [0, 1]:
             return {
                 "success": False,
                 "message": "设备状态必须是0（关闭）或1（开启）",
-                "data": {"device1": device1, "device2": device2}
+                "data": {"device1": device1, "device2": device2, "device3": device3}
             }
         
-        success, message = device_manager.switch_devices(device1, device2)
+        success, message = device_manager.switch_devices(device1, device2, device3)
         
         return {
             "success": success,
@@ -337,7 +351,8 @@ def switch_devices(device1: int, device2: int) -> dict:
             "data": {
                 "device1": device1,
                 "device2": device2,
-                "payload": {"device1": device1, "device2": device2}
+                "device3": device3,
+                "payload": {"device1": device1, "device2": device2, "device3": device3}
             }
         }
         
@@ -346,7 +361,7 @@ def switch_devices(device1: int, device2: int) -> dict:
         return {
             "success": False,
             "message": f"设备控制异常: {str(e)}",
-            "data": {"device1": device1, "device2": device2}
+            "data": {"device1": device1, "device2": device2, "device3": device3}
         }
 
 @mcp.tool()

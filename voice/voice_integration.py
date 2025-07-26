@@ -111,10 +111,8 @@ class VoiceIntegration:
                 logger.error(f"音频播放线程异常: {e}")
 
     def receive_final_text(self, final_text: str):
-        """接收最终完整文本"""
-        if not self.enabled:
+        if not config.system.voice_enabled:  # 每次播放前动态读取配置，关闭时不播放
             return
-            
         # 播放缓冲区中剩余的任何文本
         remaining_text = ' '.join(self.text_buffer).strip()
         if remaining_text:
@@ -133,8 +131,7 @@ class VoiceIntegration:
 
 
     def receive_text_chunk(self, text: str):
-        """接收文本片段"""
-        if not self.enabled:
+        if not config.system.voice_enabled:  # 每次播放前动态读取配置，关闭时不播放
             return
             
         if text and text.strip():

@@ -44,17 +44,12 @@ def check_windows_specific():
     
     # 检查 Windows 浏览器
     win_browser_paths = [
-        # Edge浏览器路径（优先）
-        r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe',
-        r'C:\Program Files\Microsoft\Edge\Application\msedge.exe',
-        os.path.expanduser(r'~\AppData\Local\Microsoft\Edge\Application\msedge.exe'),
-        # Chrome浏览器路径（备用）
         r'C:\Program Files\Google\Chrome\Application\chrome.exe',
         r'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe',
         os.path.expanduser(r'~\AppData\Local\Google\Chrome\Application\chrome.exe')
     ]
     win_browser_found = any(os.path.exists(p) for p in win_browser_paths)
-    print_status("Edge/Chrome 浏览器", win_browser_found)
+    print_status("Chrome 浏览器", win_browser_found)
     
     # 检查 Visual C++ Build Tools
     try:
@@ -76,14 +71,12 @@ def check_macos_specific():
     
     # 检查 macOS 浏览器
     mac_browser_paths = [
-        # Edge浏览器路径（优先）
-        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-        # Chrome浏览器路径（备用）
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
         "/Applications/Chromium.app/Contents/MacOS/Chromium",
+        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"
     ]
     mac_browser_found = any(os.path.exists(p) for p in mac_browser_paths)
-    print_status("Edge/Chrome 浏览器", mac_browser_found)
+    print_status("Chrome/浏览器", mac_browser_found)
     
     # 检查 PortAudio (语音功能)
     portaudio_found = os.path.exists("/opt/homebrew/lib/libportaudio.dylib") or \
@@ -127,17 +120,12 @@ def main():
     elif system == "Linux":
         print("🐧 Linux 环境检查:")
         linux_browser_paths = [
-            # Edge浏览器路径（优先）
-            '/usr/bin/microsoft-edge',
-            '/usr/bin/microsoft-edge-stable',
-            '/snap/bin/microsoft-edge',
-            # Chrome浏览器路径（备用）
             '/usr/bin/google-chrome',
             '/usr/bin/chromium-browser',
             '/usr/bin/chromium'
         ]
         linux_browser_found = any(os.path.exists(p) for p in linux_browser_paths)
-        print_status("Edge/Chrome/Chromium 浏览器", linux_browser_found)
+        print_status("Chrome/Chromium 浏览器", linux_browser_found)
         all_good &= linux_browser_found
     else:
         print(f"⚠️  未知操作系统: {system}")

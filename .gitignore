@@ -12,8 +12,6 @@ build/
 logs/
 *.log
 
-.cursorrules
-
 # 环境变量
 .env
 
@@ -38,5 +36,3 @@ Thumbs.db
 # 临时文件
 *.tmp
 *.temp
-.history
-.venv

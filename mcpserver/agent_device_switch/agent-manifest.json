@@ -2,7 +2,7 @@
   "name": "agent_mqtt_tool",
   "displayName": "设备开关控制Agent",
   "version": "1.0.0",
-  "description": "通过MQTT控制两个设备的开关，支持0/1状态控制，适用于智能家居设备管理。",
+  "description": "通过物联网控制两个设备的开关，支持0/1状态控制。",
   "author": "Naga物联网模块",
   "agentType": "mcp",
   "entryPoint": {
@@ -20,8 +20,8 @@
     "invocationCommands": [
       {
         "command": "switch_devices",
-        "description": "控制两个设备的开关状态。\n- `tool_name`: 固定为 `switch_devices`\n- `device1`: 设备1开关状态，0=关闭，1=开启（必需）\n- `device2`: 设备2开关状态，0=关闭，1=开启（必需）\n**调用示例:**\n```json\n{\"tool_name\": \"switch_devices\", \"device1\": 1, \"device2\": 0}\n```",
-        "example": "{\"tool_name\": \"switch_devices\", \"device1\": 1, \"device2\": 0}"
+        "description": "控制三个设备的开关状态。\n- `tool_name`: 固定为 `switch_devices`\n- `device1`: 设备1开关状态，0=关闭，1=开启（必需）\n- `device2`: 设备2开关状态，0=关闭，1=开启（必需）\n- `device3`: 设备3开关状态，0=关闭，1=开启（必需）\n**调用示例:**\n```json\n{\"tool_name\": \"switch_devices\", \"device1\": 1, \"device2\": 0, \"device3\": 1}\n```",
+        "example": "{\"tool_name\": \"switch_devices\", \"device1\": 1, \"device2\": 0, \"device3\": 1}"
       }
     ]
   },
@@ -30,9 +30,10 @@
     "properties": {
       "tool_name": {"type": "string", "description": "工具名称：switch_devices"},
       "device1": {"type": "integer", "description": "设备1开关状态，0=关闭，1=开启（必需）"},
-      "device2": {"type": "integer", "description": "设备2开关状态，0=关闭，1=开启（必需）"}
+      "device2": {"type": "integer", "description": "设备2开关状态，0=关闭，1=开启（必需）"},
+      "device3": {"type": "integer", "description": "设备3开关状态，0=关闭，1=开启（必需）"}
     },
-    "required": ["tool_name", "device1", "device2"]
+    "required": ["tool_name", "device1", "device2", "device3"]
   },
   "outputSchema": {
     "type": "object",
