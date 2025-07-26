@@ -27,7 +27,13 @@ from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 import aiohttp
 
-# 导入NagaAgent核心模块
+# 添加项目根目录到Python路径
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# 导入独立的工具调用模块
+from tool_call_utils import parse_tool_calls, execute_tool_calls, tool_call_loop
+
+# 导入对话核心模块
 from conversation_core import NagaConversation
 from config import config  # 使用新的配置系统
 from ui.response_utils import extract_message  # 导入消息提取工具
@@ -65,21 +71,21 @@ async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     global naga_agent
     try:
-        print("🚀 正在初始化NagaAgent...")
+        print("[INFO] 正在初始化NagaAgent...")
         naga_agent = NagaConversation()  # 第四次初始化：API服务器启动时创建
-        print("✅ NagaAgent初始化完成")
+        print("[SUCCESS] NagaAgent初始化完成")
         yield
     except Exception as e:
-        print(f"❌ NagaAgent初始化失败: {e}")
+        print(f"[ERROR] NagaAgent初始化失败: {e}")
         traceback.print_exc()
         sys.exit(1)
     finally:
-        print("🔄 正在清理资源...")
+        print("[INFO] 正在清理资源...")
         if naga_agent and hasattr(naga_agent, 'mcp'):
             try:
                 await naga_agent.mcp.cleanup()
             except Exception as e:
-                print(f"⚠️ 清理MCP资源时出错: {e}")
+                print(f"[WARNING] 清理MCP资源时出错: {e}")
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -479,140 +485,6 @@ async def get_memory_stats():
         print(f"获取记忆统计错误: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"获取记忆统计失败: {str(e)}")
-
-# 工具调用循环相关函数
-
-class ConnectionManager:
-    def parse_tool_calls(self, content: str) -> list:
-        """解析JSON格式的工具调用"""
-        tool_calls = []
-        
-        # 查找所有JSON对象
-        import json
-        import re
-        
-        # 匹配JSON对象的正则表达式
-        json_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
-        
-        for match in re.finditer(json_pattern, content):
-            json_str = match.group(0)
-            
-            # 解析JSON
-            try:
-                tool_args = json.loads(json_str)
-                
-                # 判断调用类型
-                agent_type = tool_args.get('agentType', 'mcp').lower()
-                
-                if agent_type == 'agent':
-                    # Agent类型调用格式
-                    agent_name = tool_args.get('agent_name')
-                    prompt = tool_args.get('prompt')
-                    if agent_name and prompt:
-                        tool_calls.append({
-                            'name': 'agent_call',
-                            'args': {
-                                'agentType': 'agent',
-                                'agent_name': agent_name,
-                                'prompt': prompt
-                            }
-                        })
-                else:
-                    # MCP类型调用格式
-                    tool_name = tool_args.get('tool_name')
-                    if tool_name:
-                        # 新格式：有service_name
-                        if 'service_name' in tool_args:
-                            tool_calls.append({
-                                'name': tool_name,
-                                'args': tool_args
-                            })
-                        else:
-                            # 旧格式：tool_name作为服务名
-                            service_name = tool_name
-                            tool_args['service_name'] = service_name
-                            tool_args['agentType'] = 'mcp'
-                            tool_calls.append({
-                                'name': tool_name,
-                                'args': tool_args
-                            })
-                            
-            except json.JSONDecodeError:
-                continue
-        
-        return tool_calls
-
-async def execute_tool_calls(tool_calls: list, mcp_manager) -> str:
-    """执行工具调用"""
-    results = []
-    for tool_call in tool_calls:
-        try:
-            tool_name = tool_call['name']
-            args = tool_call['args']
-            agent_type = args.get('agentType', 'mcp').lower()
-            
-            # 根据agentType分流处理
-            if agent_type == 'agent':
-                # Agent类型：交给AgentManager处理
-                try:
-                    from mcpserver.agent_manager import get_agent_manager
-                    agent_manager = get_agent_manager()
-                    
-                    agent_name = args.get('agent_name')
-                    prompt = args.get('prompt')
-                    
-                    if not agent_name or not prompt:
-                        result = "Agent调用失败: 缺少agent_name或prompt参数"
-                    else:
-                        # 直接调用Agent
-                        result = await agent_manager.call_agent(agent_name, prompt)
-                        if result.get("status") == "success":
-                            result = result.get("result", "")
-                        else:
-                            result = f"Agent调用失败: {result.get('error', '未知错误')}"
-                            
-                except Exception as e:
-                    result = f"Agent调用失败: {str(e)}"
-                    
-            else:
-                # MCP类型：走handoff流程
-                service_name = args.get('service_name', tool_name)
-                result = await mcp_manager.handoff(
-                        service_name=service_name,
-                        task=args
-                )
-                
-                results.append(f"来自工具 \"{tool_name}\" 的结果:\n{result}")
-        except Exception as e:
-            error_result = f"执行工具 {tool_call['name']} 时发生错误：{str(e)}"
-            results.append(error_result)
-    return "\n\n---\n\n".join(results)
-
-async def tool_call_loop(messages: list, mcp_manager, llm_caller, is_streaming: bool = False) -> dict:
-    """工具调用循环主流程"""
-    recursion_depth = 0
-    max_recursion = int(os.getenv('MaxhandoffLoopStream', '5')) if is_streaming else int(os.getenv('MaxhandoffLoopNonStream', '5'))
-    current_messages = messages.copy()
-    current_ai_content = ''
-    while recursion_depth < max_recursion:
-        try:
-            llm_response = await llm_caller(current_messages)
-            current_ai_content = llm_response.get('content', '')
-            tool_calls = parse_tool_calls(current_ai_content)
-            if not tool_calls:
-                break
-            tool_results = await execute_tool_calls(tool_calls, mcp_manager)
-            current_messages.append({'role': 'assistant', 'content': current_ai_content})
-            current_messages.append({'role': 'user', 'content': tool_results})
-            recursion_depth += 1
-        except Exception as e:
-            print(f"工具调用循环错误: {e}")
-            break
-    return {
-        'content': current_ai_content,
-        'recursion_depth': recursion_depth,
-        'messages': current_messages
-    }
 
 if __name__ == "__main__":
     import argparse

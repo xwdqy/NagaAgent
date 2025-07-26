@@ -251,7 +251,7 @@ class ElegantSettingsWidget(QWidget):
         
         # 模型选择
         model_combo = QComboBox()
-        model_combo.addItems(["deepseek-chat", "deepseek-coder", "gpt-4o-mini", "qwen3:32b", "qwen2.5-32b-instruct"])
+        model_combo.addItems(["deepseek-chat", "deepseek-coder", "gpt-4o-mini", "qwen3:32b", "qwen2.5-32b-instruct", "TIG-3.6-VL-Lite"])
         model_combo.setStyleSheet(self.get_combo_style())
         model_card = SettingCard(
             "AI 模型",
@@ -272,7 +272,7 @@ class ElegantSettingsWidget(QWidget):
         # 温度参数
         temp_slider = QSlider(Qt.Horizontal)
         temp_slider.setRange(0, 100)
-        temp_slider.setValue(70)
+        temp_slider.setValue(70)  # 对应0.7
         temp_slider.setStyleSheet(self.get_slider_style())
         temp_card = SettingCard(
             "响应温度",

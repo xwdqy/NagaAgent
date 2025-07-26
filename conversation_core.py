@@ -3,6 +3,7 @@ import os
 # import asyncio # 日志与系统
 from datetime import datetime # 时间
 from mcpserver.mcp_manager import get_mcp_manager # 多功能管理
+from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX # handoff提示词
 # from mcpserver.agent_playwright_master import ControllerAgent, BrowserAgent, ContentAgent # 导入浏览器相关类
 from openai import OpenAI,AsyncOpenAI # LLM
 # import difflib # 模糊匹配
@@ -16,6 +17,8 @@ from typing import List, Dict # 修复List未导入
 from thinking import TreeThinkingEngine # 树状思考引擎
 from thinking.config import COMPLEX_KEYWORDS # 复杂关键词
 from config import config
+# 导入独立的工具调用模块
+from apiserver.tool_call_utils import parse_tool_calls, execute_tool_calls, tool_call_loop
 
 # 完全禁用GRAG记忆系统导入
 # GRAG记忆系统导入
@@ -201,185 +204,6 @@ class NagaConversation: # 对话主类
             }
 
     # 工具调用循环相关方法
-    def _parse_tool_calls(self, content: str) -> list:
-        """解析JSON格式的工具调用，支持MCP和Agent两种类型"""
-        tool_calls = []
-        call_count = 0
-        
-        print(f"[DEBUG] 开始解析工具调用，内容长度: {len(content)}")
-        
-        # 查找所有JSON对象
-        import json
-        import re
-        
-        # 匹配JSON对象的正则表达式
-        json_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
-        
-        for match in re.finditer(json_pattern, content):
-            json_str = match.group(0)
-            call_count += 1
-            
-            print(f"[DEBUG] 找到JSON对象{call_count}，原始内容: {json_str}")
-            
-            # 解析JSON
-            try:
-                tool_args = json.loads(json_str)
-                print(f"[DEBUG] JSON格式解析成功: {tool_args}")
-                
-                # 判断调用类型
-                agent_type = tool_args.get('agentType', 'mcp').lower()
-                
-                if agent_type == 'agent':
-                    # Agent类型调用格式
-                    agent_name = tool_args.get('agent_name')
-                    prompt = tool_args.get('prompt')
-                    if agent_name and prompt:
-                        tool_call = {
-                            'name': 'agent_call',
-                            'args': {
-                                'agentType': 'agent',
-                                'agent_name': agent_name,
-                                'prompt': prompt
-                            }
-                        }
-                        tool_calls.append(tool_call)
-                        print(f"[DEBUG] 解析为Agent调用: {tool_call}")
-                else:
-                    # MCP类型调用格式
-                    tool_name = tool_args.get('tool_name')
-                    if tool_name:
-                        # 新格式：有service_name
-                        if 'service_name' in tool_args:
-                            tool_call = {
-                                'name': tool_name,
-                                'args': tool_args
-                            }
-                            tool_calls.append(tool_call)
-                            print(f"[DEBUG] 解析为MCP调用(新格式): {tool_call}")
-                        else:
-                            # 旧格式：tool_name作为服务名
-                            service_name = tool_name
-                            tool_args['service_name'] = service_name
-                            tool_args['agentType'] = 'mcp'
-                            tool_call = {
-                                'name': tool_name,
-                                'args': tool_args
-                            }
-                            tool_calls.append(tool_call)
-                            print(f"[DEBUG] 解析为MCP调用(旧格式): {tool_call}")
-                            
-            except json.JSONDecodeError as e:
-                print(f"[DEBUG] JSON解析失败: {e}")
-                continue
-        
-        print(f"[DEBUG] 工具调用解析完成，共解析到 {len(tool_calls)} 个调用")
-        return tool_calls
-
-    async def _execute_tool_calls(self, tool_calls: list) -> str:
-        """执行工具调用"""
-        results = []
-        for i, tool_call in enumerate(tool_calls):
-            try:
-                print(f"[DEBUG] 开始执行工具调用{i+1}: {tool_call['name']}")
-                
-                # 解析工具调用格式
-                tool_name = tool_call['name']
-                args = tool_call['args']
-                agent_type = args.get('agentType', 'mcp').lower()
-                
-                print(f"[DEBUG] 工具类型: {agent_type}, 参数: {args}")
-                
-                # 根据agentType分流处理
-                if agent_type == 'agent':
-                    # Agent类型：交给AgentManager处理
-                    try:
-                        from mcpserver.agent_manager import get_agent_manager
-                        agent_manager = get_agent_manager()
-                        
-                        agent_name = args.get('agent_name')
-                        prompt = args.get('prompt')
-                        
-                        print(f"[DEBUG] Agent调用: {agent_name}, prompt: {prompt}")
-                        
-                        if not agent_name or not prompt:
-                            result = "Agent调用失败: 缺少agent_name或prompt参数"
-                        else:
-                            # 直接调用Agent
-                            result = await agent_manager.call_agent(agent_name, prompt)
-                            if result.get("status") == "success":
-                                result = result.get("result", "")
-                            else:
-                                result = f"Agent调用失败: {result.get('error', '未知错误')}"
-                                
-                    except Exception as e:
-                        result = f"Agent调用失败: {str(e)}"
-                        
-                else:
-                    # MCP类型：走handoff流程
-                    service_name = args.get('service_name')
-                    actual_tool_name = args.get('tool_name', tool_name)
-                    # 只过滤掉系统参数，保留tool_name给Agent使用
-                    tool_args = {k: v for k, v in args.items() 
-                               if k not in ['service_name', 'agentType']}
-                    
-                    print(f"[DEBUG] MCP调用: service={service_name}, tool={actual_tool_name}, args={tool_args}")
-                    
-                    if not service_name:
-                        result = "MCP调用失败: 缺少service_name参数"
-                    else:
-                        result = await self.mcp.unified_call(
-                        service_name=service_name,
-                        tool_name=actual_tool_name,
-                        args=tool_args
-                    )
-                
-                print(f"[DEBUG] 工具调用{i+1}执行结果: {result}")
-                results.append(f"来自工具 \"{tool_name}\" 的结果:\n{result}")
-            except Exception as e:
-                error_result = f"执行工具 {tool_call['name']} 时发生错误：{str(e)}"
-                print(f"[DEBUG] 工具调用{i+1}执行异常: {error_result}")
-                results.append(error_result)
-        return "\n\n---\n\n".join(results)
-
-    async def handle_tool_call_loop(self, messages: List[Dict], is_streaming: bool = False) -> Dict:
-        """处理工具调用循环"""
-        recursion_depth = 0
-        max_recursion = config.handoff.max_loop_stream if is_streaming else config.handoff.max_loop_non_stream
-        current_messages = messages.copy()
-        current_ai_content = ''
-        while recursion_depth < max_recursion:
-            try:
-                resp = await self._call_llm(current_messages)
-                current_ai_content = resp.get('content', '')
-                
-                # DEBUG: 输出LLM回复内容，方便检查工具调用格式
-                print(f"[DEBUG] 第{recursion_depth + 1}轮LLM回复:")
-                print(f"[DEBUG] 回复内容: {current_ai_content}")
-                
-                tool_calls = self._parse_tool_calls(current_ai_content)
-                print(f"[DEBUG] 解析到工具调用数量: {len(tool_calls)}")
-                
-                if not tool_calls:
-                    print(f"[DEBUG] 无工具调用，退出循环")
-                    break
-                    
-                # DEBUG: 输出解析到的工具调用详情
-                for i, tool_call in enumerate(tool_calls):
-                    print(f"[DEBUG] 工具调用{i+1}: {tool_call}")
-                
-                tool_results = await self._execute_tool_calls(tool_calls)
-                current_messages.append({'role': 'assistant', 'content': current_ai_content})
-                current_messages.append({'role': 'user', 'content': tool_results})
-                recursion_depth += 1
-            except Exception as e:
-                print(f"工具调用循环错误: {e}")
-                break
-        return {
-            'content': current_ai_content,
-            'recursion_depth': recursion_depth,
-            'messages': current_messages
-        }
-
     def handle_llm_response(self, a, mcp):
         # 只保留普通文本流式输出逻辑 #
         async def text_stream():
@@ -443,15 +267,18 @@ class NagaConversation: # 对话主类
                                         params.append(f"{key}: {value}")
                             
                             # 构建调用格式
-                            format_str = f"  {tool_name}:\n"
-                            format_str += f"    {{\n"
-                            format_str += f"      \"agentType\": \"mcp\",\n"
-                            format_str += f"      \"service_name\": \"{name}\",\n"
-                            format_str += f"      \"tool_name\": \"{tool_name}\",\n"
+                            format_str = f"  {tool_name}: ｛\n"
+                            format_str += f"    \"agentType\": \"mcp\",\n"
+                            format_str += f"    \"service_name\": \"{name}\",\n"
+                            format_str += f"    \"tool_name\": \"{tool_name}\",\n"
                             for param in params:
-                                key, value = param.split(": ", 1)
-                                format_str += f"      \"{key}\": \"{value}\",\n"
-                            format_str += f"    }}"
+                                # 将中文参数名转换为英文
+                                param_key, param_value = param.split(': ', 1)
+                                if param_key == 'city' and name == 'WeatherTimeAgent':
+                                    format_str += f"    \"{param_key}\": \"{local_city}\",\n"
+                                else:
+                                    format_str += f"    \"{param_key}\": \"{param_value}\",\n"
+                            format_str += f"  ｝\n"
                             
                             mcp_list.append(format_str)
                         except:
@@ -529,7 +356,8 @@ class NagaConversation: # 对话主类
             #     except Exception as e:
             #         logger.error(f"GRAG记忆查询失败: {e}")
             
-            system_prompt = config.prompts.naga_system_prompt
+            # 添加handoff提示词
+            system_prompt = f"{RECOMMENDED_PROMPT_PREFIX}\n{config.prompts.naga_system_prompt}"
             
             # 获取过滤后的服务列表
             available_services = self.mcp.get_available_services_filtered()
@@ -550,7 +378,7 @@ class NagaConversation: # 对话主类
             
             # 普通模式：走工具调用循环（不等待思考树判断）
             try:
-                result = await self.handle_tool_call_loop(msgs, is_streaming=True)
+                result = await tool_call_loop(msgs, self.mcp, self._call_llm, is_streaming=True)
                 final_content = result['content']
                 recursion_depth = result['recursion_depth']
                 

@@ -355,22 +355,20 @@ class SystemPrompts(BaseModel):
 
 
 【工具调用格式要求】
-如需调用某个工具，直接严格输出下面的json格式（可多次出现）：
+如需调用某个工具，直接严格输出下面的格式（可多次出现）：
 
-MCP服务调用格式：
-{
-  "agentType": "mcp",
-  "service_name": "MCP服务名称",
-  "tool_name": "工具名称",
-  "参数名": "参数值"
-}
+｛
+"agentType": "mcp",
+"service_name": "MCP服务名称",
+"tool_name": "工具名称",
+"param_name": "参数值"
+｝
 
-Agent服务调用格式：
-{
-  "agentType": "agent",
-  "agent_name": "Agent名称",
-  "prompt": "任务内容"
-}
+｛
+"agentType": "agent",
+"agent_name": "Agent名称",
+"prompt": "任务内容"
+｝
 
 服务类型说明：
 - agentType: "mcp" - MCP服务，使用工具调用格式
