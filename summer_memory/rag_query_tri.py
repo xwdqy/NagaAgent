@@ -66,7 +66,7 @@ def query_knowledge(user_question):
         body["messages"] = [{"role": "user", "content": simplified_prompt}]
 
     try:
-        response = requests.post(API_URL, headers=headers, json=body, timeout=10)
+        response = requests.post(API_URL, headers=headers, json=body, timeout=20)
         response.raise_for_status()
         content = response.json()
 

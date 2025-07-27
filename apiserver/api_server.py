@@ -31,15 +31,14 @@ import aiohttp
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 导入独立的工具调用模块
-from tool_call_utils import parse_tool_calls, execute_tool_calls, tool_call_loop
+from .tool_call_utils import parse_tool_calls, execute_tool_calls, tool_call_loop
 
-# 导入对话核心模块
-from conversation_core import NagaConversation
+# 导入配置系统
 from config import config  # 使用新的配置系统
 from ui.response_utils import extract_message  # 导入消息提取工具
 
-# 全局NagaAgent实例
-naga_agent: Optional[NagaConversation] = None
+# 全局NagaAgent实例 - 延迟导入避免循环依赖
+naga_agent = None
 
 # WebSocket连接管理
 class ConnectionManager:
@@ -72,6 +71,8 @@ async def lifespan(app: FastAPI):
     global naga_agent
     try:
         print("[INFO] 正在初始化NagaAgent...")
+        # 延迟导入避免循环依赖
+        from conversation_core import NagaConversation
         naga_agent = NagaConversation()  # 第四次初始化：API服务器启动时创建
         print("[SUCCESS] NagaAgent初始化完成")
         yield

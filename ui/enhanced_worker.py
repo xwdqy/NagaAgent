@@ -25,6 +25,14 @@ class EnhancedWorker(QThread):
         self.is_cancelled = False
         self.result_buffer = []
         
+        # 初始化语音集成模块
+        try:
+            from voice.voice_integration import get_voice_integration
+            self.voice_integration = get_voice_integration()
+        except Exception as e:
+            print(f"语音集成初始化失败: {e}")
+            self.voice_integration = None
+        
     def cancel(self):
         """取消当前操作"""
         self.is_cancelled = True
@@ -176,12 +184,11 @@ class StreamingWorker(EnhancedWorker):
                         self.stream_chunk.emit(content_str)
                         
                         # 发送文本到语音集成模块
-                        try:
-                            from voice.voice_integration import get_voice_integration
-                            voice_integration = get_voice_integration()
-                            voice_integration.receive_text_chunk(content_str)
-                        except Exception as e:
-                            print(f"语音集成错误: {e}")
+                        if self.voice_integration:
+                            try:
+                                self.voice_integration.receive_text_chunk(content_str)
+                            except Exception as e:
+                                print(f"语音集成错误: {e}")
                         
                         # 更新缓冲区用于实时显示
                         self.streaming_buffer += content_str
@@ -192,12 +199,11 @@ class StreamingWorker(EnhancedWorker):
                     self.stream_chunk.emit(content_str)
                     
                     # 发送文本到语音集成模块
-                    try:
-                        from voice.voice_integration import get_voice_integration
-                        voice_integration = get_voice_integration()
-                        voice_integration.receive_text_chunk(content_str)
-                    except Exception as e:
-                        print(f"语音集成错误: {e}")
+                    if self.voice_integration:
+                        try:
+                            self.voice_integration.receive_text_chunk(content_str)
+                        except Exception as e:
+                            print(f"语音集成错误: {e}")
                     
                     self.streaming_buffer += content_str
                     word_count += len(content_str)
@@ -223,13 +229,12 @@ class StreamingWorker(EnhancedWorker):
             
             if not self.is_cancelled:
                 # 发送最终完整文本到语音集成模块
-                try:
-                    from voice.voice_integration import get_voice_integration
-                    voice_integration = get_voice_integration()
-                    final_text = ''.join(result_chunks)
-                    voice_integration.receive_final_text(final_text)
-                except Exception as e:
-                    print(f"语音集成错误: {e}")
+                if self.voice_integration:
+                    try:
+                        final_text = ''.join(result_chunks)
+                        self.voice_integration.receive_final_text(final_text)
+                    except Exception as e:
+                        print(f"语音集成错误: {e}")
                 
                 # 流式完成
                 self.stream_complete.emit()
@@ -286,13 +291,12 @@ class BatchWorker(EnhancedWorker):
             
             if not self.is_cancelled:
                 # 发送最终完整文本到语音集成模块
-                try:
-                    from voice.voice_integration import get_voice_integration
-                    voice_integration = get_voice_integration()
-                    final_text = ''.join(result_chunks)
-                    voice_integration.receive_final_text(final_text)
-                except Exception as e:
-                    print(f"语音集成错误: {e}")
+                if self.voice_integration:
+                    try:
+                        final_text = ''.join(result_chunks)
+                        self.voice_integration.receive_final_text(final_text)
+                    except Exception as e:
+                        print(f"语音集成错误: {e}")
                 
                 self.progress_updated.emit(90, "整理回复内容")
                 await asyncio.sleep(0.2)  # 短暂等待，让用户看到进度

@@ -49,25 +49,28 @@ class AgentSession:
 class AgentManager:
     """Agent管理器"""
     
-    def __init__(self, config_dir: str = "agent_configs"):
+    def __init__(self, config_dir: str = None):
         """
         初始化Agent管理器
         
         Args:
-            config_dir: Agent配置文件目录
+            config_dir: Agent配置文件目录（可选，MCP架构下通常不需要）
         """
-        self.config_dir = Path(config_dir)
+        self.config_dir = Path(config_dir) if config_dir else None
         self.agents: Dict[str, AgentConfig] = {}
         self.agent_sessions: Dict[str, Dict[str, AgentSession]] = {}
         self.max_history_rounds = 7  # 最大历史轮数
         self.context_ttl_hours = 24  # 上下文TTL（小时）
         self.debug_mode = True
         
-        # 确保配置目录存在
-        self.config_dir.mkdir(exist_ok=True)
-        
-        # 加载Agent配置
-        self._load_agent_configs()
+        # 只在指定了config_dir时才创建目录和加载配置
+        if self.config_dir:
+            # 确保配置目录存在
+            self.config_dir.mkdir(exist_ok=True)
+            # 加载Agent配置
+            self._load_agent_configs()
+        else:
+            logger.info("AgentManager使用MCP架构，跳过外部配置文件加载")
         
         # 启动定期清理任务（只在事件循环中启动）
         try:
@@ -81,6 +84,11 @@ class AgentManager:
     
     def _load_agent_configs(self):
         """从配置文件加载Agent定义"""
+        # 检查config_dir是否存在
+        if not self.config_dir:
+            logger.info("未指定配置文件目录，跳过Agent配置加载")
+            return
+            
         # 扫描配置文件目录
         config_files = list(self.config_dir.glob("*.json"))
         

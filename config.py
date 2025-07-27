@@ -216,14 +216,22 @@ class BrowserConfig(BaseModel):
 class TTSConfig(BaseModel):
     """TTS服务配置"""
     api_key: str = Field(default="your_api_key_here", description="TTS服务API密钥")
-    port: int = Field(default=5050, ge=1, le=65535, description="TTS服务端口")
-    default_voice: str = Field(default="en-US-AvaNeural", description="默认语音")
+    port: int = Field(default=5048, ge=1, le=65535, description="TTS服务端口")
+    default_voice: str = Field(default="zh-CN-XiaoxiaoNeural", description="默认语音")
     default_format: str = Field(default="mp3", description="默认音频格式")
     default_speed: float = Field(default=1.0, ge=0.1, le=3.0, description="默认语速")
-    default_language: str = Field(default="en-US", description="默认语言")
+    default_language: str = Field(default="zh-CN", description="默认语言")
     remove_filter: bool = Field(default=False, description="是否移除过滤")
     expand_api: bool = Field(default=True, description="是否扩展API")
-    require_api_key: bool = Field(default=True, description="是否需要API密钥")
+    require_api_key: bool = Field(default=False, description="是否需要API密钥")
+    
+    # 新增配置项
+    provider: str = Field(default="edgetts", description="TTS提供商(edgetts/minimax)")
+    group_id: str = Field(default="your_minimax_group_id_here", description="Minimax的group_id")
+    tts_model: str = Field(default="speech-02-hd", description="TTS模型名称")
+    emotion: str = Field(default="neutral", description="情感参数")
+    minimax_emotion: str = Field(default="neutral", description="Minimax情感参数")
+    keep_audio_files: bool = Field(default=False, description="是否保留音频文件用于调试")
 
 
 class QuickModelConfig(BaseModel):
@@ -318,6 +326,11 @@ class MQTTConfig(BaseModel):
     password: str = Field(default="", description="MQTT密码")
     keepalive: int = Field(default=60, ge=1, le=3600, description="保持连接时间（秒）")
     qos: int = Field(default=1, ge=0, le=2, description="服务质量等级")
+
+
+class WeatherConfig(BaseModel):
+    """天气服务配置"""
+    api_key: str = Field(default="", description="天气服务API密钥")
 
 
 class UIConfig(BaseModel):
@@ -474,6 +487,7 @@ class NagaConfig(BaseModel):
     prompts: SystemPrompts = Field(default_factory=SystemPrompts)
     ui: UIConfig = Field(default_factory=UIConfig)
     mqtt: MQTTConfig = Field(default_factory=MQTTConfig)
+    weather: WeatherConfig = Field(default_factory=WeatherConfig)
 
     class Config:
         extra = 'ignore'
@@ -645,6 +659,9 @@ MQTT_USERNAME = config.mqtt.username
 MQTT_PASSWORD = config.mqtt.password
 MQTT_KEEPALIVE = config.mqtt.keepalive
 MQTT_QOS = config.mqtt.qos
+
+# 天气配置兼容性变量
+WEATHER_API_KEY = config.weather.api_key
 
 # 配置字典，兼容旧版本
 QUICK_MODEL_CONFIG = config.quick_model_config_dict

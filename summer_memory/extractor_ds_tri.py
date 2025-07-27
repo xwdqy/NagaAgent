@@ -40,7 +40,7 @@ def extract_triples(text):
     }
 
     try:
-        response = requests.post(API_URL, headers=headers, json=body, timeout=10)
+        response = requests.post(API_URL, headers=headers, json=body, timeout=20)
 
         print("状态码:", response.status_code)
         print("响应内容:", response.text)

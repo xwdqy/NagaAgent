@@ -20,18 +20,16 @@ from config import config
 # 导入独立的工具调用模块
 from apiserver.tool_call_utils import parse_tool_calls, execute_tool_calls, tool_call_loop
 
-# 完全禁用GRAG记忆系统导入
 # GRAG记忆系统导入
-# if config.grag.enabled:
-#     try:
-#         from summer_memory.memory_manager import memory_manager
-
-#     except Exception as e:
-#         logger = logging.getLogger("NagaConversation")
-#         logger.error(f"夏园记忆系统加载失败: {e}")
-#         memory_manager = None
-# else:
-#     memory_manager = None
+if config.grag.enabled:
+    try:
+        from summer_memory.memory_manager import memory_manager
+    except Exception as e:
+        logger = logging.getLogger("NagaConversation")
+        logger.error(f"夏园记忆系统加载失败: {e}")
+        memory_manager = None
+else:
+    memory_manager = None
 
 def now():
     return time.strftime('%H:%M:%S:')+str(int(time.time()*1000)%10000) # 当前时间
@@ -62,6 +60,7 @@ logger = logging.getLogger("NagaConversation")
 _TREE_THINKING_SUBSYSTEMS_INITIALIZED=False
 _MCP_SERVICES_INITIALIZED=False
 _QUICK_MODEL_MANAGER_INITIALIZED=False
+_VOICE_ENABLED_LOGGED=False
 
 class NagaConversation: # 对话主类
     def __init__(self):
@@ -75,21 +74,24 @@ class NagaConversation: # 对话主类
         self._init_mcp_services()
         
         # 初始化GRAG记忆系统（只在首次初始化时显示日志）
-        # 完全禁用GRAG记忆系统
-        self.memory_manager = None
-        # if self.memory_manager and not hasattr(self.__class__, '_memory_initialized'):
-        #     logger.info("夏园记忆系统已初始化")
-        #     self.__class__._memory_initialized = True
+        self.memory_manager = memory_manager
+        if self.memory_manager and not hasattr(self.__class__, '_memory_initialized'):
+            logger.info("夏园记忆系统已初始化")
+            self.__class__._memory_initialized = True
         
         # 初始化语音处理系统
         self.voice = None
         if config.system.voice_enabled:
             try:
-                from voice.input.voice_handler import VoiceHandler
-                self.voice = VoiceHandler()
-                logger.info("语音处理系统已初始化")
+                # 语音功能已迁移到voice_integration.py，由ui/enhanced_worker.py调用
+                # 不再需要在这里初始化VoiceHandler
+                # 使用全局变量避免重复输出日志
+                global _VOICE_ENABLED_LOGGED
+                if not _VOICE_ENABLED_LOGGED:
+                    logger.info("语音功能已启用，由UI层管理")
+                    _VOICE_ENABLED_LOGGED = True
             except Exception as e:
-                logger.warning(f"语音处理系统初始化失败: {e}")
+                logger.warning(f"语音系统初始化失败: {e}")
                 self.voice = None
         
         # 恢复树状思考系统
@@ -393,13 +395,12 @@ class NagaConversation: # 对话主类
                 self.messages += [{"role": "user", "content": u}, {"role": "assistant", "content": final_content}]
                 self.save_log(u, final_content)
                 
-                # 完全禁用GRAG记忆存储
                 # GRAG记忆存储（开发者模式不写入）
-                # if self.memory_manager and not self.dev_mode:
-                #     try:
-                #         await self.memory_manager.add_conversation_memory(u, final_content + "\n\n" + final_thinking_answer)
-                #     except Exception as e:
-                #         logger.error(f"GRAG记忆存储失败: {e}")
+                if self.memory_manager and not self.dev_mode:
+                    try:
+                        await self.memory_manager.add_conversation_memory(u, final_content)
+                    except Exception as e:
+                        logger.error(f"GRAG记忆存储失败: {e}")
                 
                 # 检查异步思考判断结果，如果建议深度思考则提示用户
                 if thinking_task and not thinking_task.done():
