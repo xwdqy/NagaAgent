@@ -67,7 +67,7 @@
     "max_retries": 2
   },
   "weather": {
-    "api_key": "06e5619c6e787a67ae4b9f177ab48fe2"
+    "api_key": " "
   },
   "mqtt": {
     "enabled": true,
