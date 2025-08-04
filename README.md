@@ -191,7 +191,7 @@ python check_env.py
 - **完整消息序列构建**，自动组装系统消息、历史消息和用户消息，确保对话上下文完整性
 - **多模型提供商支持**，支持OpenAI、DeepSeek、Anthropic等多种LLM提供商，每个Agent可独立配置
 - **会话隔离与TTL管理**，支持多用户多会话隔离，自动清理过期会话数据
-- **统一工具调用接口**，MCP和Agent类型服务通过统一的HANDOFF格式调用，支持混合调用场景
+- **统一工具调用接口**，MCP和Agent类型服务通过统一的JSON格式调用，支持混合调用场景
 - 聊天窗口支持**Markdown语法**，包括标题、粗体、斜体、代码块、表格、图片等。
 
 ---
@@ -264,7 +264,7 @@ NagaAgent支持两种类型的工具调用：
 - **Agent服务调用**：通过`agentType: agent`调用Agent类型的Agent
 
 ### 工具调用格式
-系统支持两种格式的工具调用：
+系统支持统一的JSON格式工具调用：
 
 #### MCP服务调用格式
 ```json
@@ -286,7 +286,7 @@ NagaAgent支持两种类型的工具调用：
 ```
 
 ### 工具调用流程
-1. **LLM输出HANDOFF格式**：LLM根据用户需求输出工具调用请求
+1. **LLM输出JSON格式**：LLM根据用户需求输出工具调用请求
 2. **自动解析agentType**：系统首先解析agentType字段，确定调用类型
 3. **路由到对应管理器**：
    - `mcp`类型 → 路由到MCPManager处理
@@ -337,11 +337,11 @@ result = await agent_manager.call_agent(
 
 # 通过工具调用循环调用Agent
 # LLM会输出：
-# <<<[HANDOFF]>>>
-# agentType: 「始」agent「末」
-# agent_name: 「始」ExampleAgent「末」
-# prompt: 「始」请帮我分析这份数据「末」
-# <<<[END_HANDOFF]>>>
+# {
+#   "agentType": "agent",
+#   "agent_name": "ExampleAgent",
+#   "prompt": "请帮我分析这份数据"
+# }
 ```
 
 #### 混合调用示例
@@ -639,11 +639,11 @@ result = await mcp_manager.unified_call(
 
 #### 工具调用格式
 ```
-<<<[HANDOFF]>>>
-agentType: 「始」agent「末」
-agent_name: 「始」ExampleAgent「末」
-prompt: 「始」用户任务内容「末」
-<<<[END_HANDOFF]>>>
+{
+  "agentType": "agent",
+  "agent_name": "ExampleAgent",
+  "prompt": "用户任务内容"
+}
 ```
 
 #### 动作调用格式
@@ -874,7 +874,7 @@ MODEL_PROVIDERS = {
 ### 工具调用问题
 - 工具调用循环次数过多：调整`config.py`中的`MAX_handoff_LOOP_STREAM`和`MAX_handoff_LOOP_NON_STREAM`
 - 工具调用失败：检查MCP服务是否正常运行，查看日志输出
-- 格式错误：确保LLM输出严格遵循HANDOFF格式
+- 格式错误：确保LLM输出严格遵循JSON格式
 
 ### GRAG记忆系统问题
 - Neo4j连接失败：检查Neo4j服务是否启动，确认连接参数正确
@@ -951,26 +951,28 @@ MIT License
 ## 工具调用循环机制详解
 
 ### 核心特性
-- **自动解析**：系统自动解析LLM返回的HANDOFF格式工具调用
+- **自动解析**：系统自动解析LLM返回的JSON格式工具调用
 - **递归执行**：支持多轮工具调用循环，最大循环次数可配置
 - **错误处理**：完善的错误处理和回退机制
 - **流式支持**：支持流式和非流式两种模式
 
 ### 工具调用格式
-LLM必须严格按照以下格式输出工具调用：
+LLM必须严格按照以下JSON格式输出工具调用：
 
-```
-<<<[HANDOFF]>>>
-tool_name: 「始」服务名称「末」
-param1: 「始」参数值1「末」
-param2: 「始」参数值2「末」
-<<<[END_HANDOFF]>>>
+```json
+{
+  "agentType": "mcp",
+  "service_name": "服务名称",
+  "tool_name": "工具名称",
+  "param1": "参数值1",
+  "param2": "参数值2"
+}
 ```
 
 ### 执行流程
 1. **接收用户消息**
 2. **调用LLM API**
-3. **解析HANDOFF格式工具调用**
+3. **解析JSON格式工具调用**
 4. **执行工具调用（通过MCP服务）**
 5. **将结果返回给LLM**
 6. **重复步骤2-5直到无工具调用或达到最大循环次数**
@@ -1052,7 +1054,7 @@ GET /memory/stats
   - 注册时自动输出所有已注册agent的名称和说明，便于调试
   - 简化Agent类型：只支持`mcp`和`agent`两种类型
 
-- handoff机制全部通过`handle_handoff`异步方法调度，兼容HANDOFF和handoff两种格式
+- handoff机制全部通过`handle_handoff`异步方法调度，兼容JSON和handoff两种格式
 
 - 新增/删除agent只需增删py文件，无需重启主程序
 
