@@ -32,7 +32,7 @@ dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.34.0",
     "librosa>=0.11.0",
-    "websockets>=12.0",
+    "websockets>=14.0",  # 使用最新版本避免弃用警告
     
     # AI和数据处理相关
     "numpy>=1.24.0,<2.0.0",

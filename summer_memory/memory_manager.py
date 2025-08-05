@@ -33,7 +33,7 @@ class GRAGMemoryManager:
             self.enabled = False
 
     async def add_conversation_memory(self, user_input: str, ai_response: str) -> bool:
-        """添加对话记忆到知识图谱（同时更新上下文和三元组）"""
+        """添加对话记忆到知识图谱（同时更新上下文和五元组）"""
         if not self.enabled:
             return False
         try:
@@ -47,13 +47,15 @@ class GRAGMemoryManager:
 
             # 提取和存储五元组
             if self.auto_extract:
-                # 创建并等待任务完成
+                # 创建并等待任务完成 - 减少超时时间
                 task = asyncio.create_task(self._extract_and_store_quintuples(conversation_text))
-                # 添加超时防止永久阻塞
+                # 减少超时时间从20秒到12秒，避免阻塞主流程
                 try:
-                    await asyncio.wait_for(task, timeout=20.0)
+                    await asyncio.wait_for(task, timeout=12.0)
                 except asyncio.TimeoutError:
-                    logger.warning("五元组提取任务超时")
+                    logger.warning("五元组提取任务超时，继续主流程")
+                    # 超时不影响主流程，返回True
+                    return True
             return True
         except Exception as e:
             logger.error(f"添加对话记忆失败: {e}")

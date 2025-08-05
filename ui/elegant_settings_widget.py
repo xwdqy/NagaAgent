@@ -82,7 +82,7 @@ class SettingCard(QWidget):
         
         # 右侧控件区域
         control_container = QWidget()
-        control_container.setFixedWidth(200)
+        control_container.setFixedWidth(400)  # 增加到两倍宽度
         control_layout = QHBoxLayout(control_container)
         control_layout.setContentsMargins(0, 0, 0, 0)
         control_layout.addWidget(self.control_widget)
@@ -288,7 +288,7 @@ class ElegantSettingsWidget(QWidget):
         # version 只读
         if hasattr(config.system, "version"):
             version_label = QLabel(str(config.system.version))
-            version_label.setStyleSheet("color: #fff;")
+            version_label.setStyleSheet("color: #fff; font: 10pt 'Lucida Console';")  # 和历史轮数一样的字体大小
             version_card = SettingCard("系统版本", "当前系统版本号", version_label, None)
             group.add_card(version_card)
         # voice_enabled
@@ -323,7 +323,7 @@ class ElegantSettingsWidget(QWidget):
             log_combo = QComboBox()
             log_combo.addItems(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
             log_combo.setCurrentText(config.system.log_level)
-            log_combo.setStyleSheet(self.get_combo_style() + "color: #fff;")
+            log_combo.setStyleSheet(self.get_combo_style() + "color: #fff;")  # 确保下拉栏字体为白色
             log_card = SettingCard("日志级别", "系统日志输出级别", log_combo, "system.log_level")
             log_card.value_changed.connect(self.on_setting_changed)
             group.add_card(log_card)

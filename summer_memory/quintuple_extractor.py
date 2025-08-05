@@ -4,6 +4,7 @@ import logging
 import re
 import sys
 import os
+import time
 
 # 添加项目根目录到路径，以便导入config
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -43,26 +44,49 @@ def extract_quintuples(text):
         "temperature": 0.5
     }
 
-    try:
-        response = requests.post(API_URL, headers=headers, json=body, timeout=20)
+    # 重试机制配置
+    max_retries = 2
+    base_timeout = 15  # 减少基础超时时间
+    
+    for attempt in range(max_retries + 1):
+        try:
+            # 根据重试次数调整超时时间
+            timeout = base_timeout + (attempt * 5)  # 15s, 20s, 25s
+            
+            logger.info(f"尝试提取五元组 (第{attempt + 1}次，超时{timeout}s)")
+            response = requests.post(API_URL, headers=headers, json=body, timeout=timeout)
 
-        print("状态码:", response.status_code)
-        print("响应内容:", response.text)
+            logger.debug(f"状态码: {response.status_code}")
+            logger.debug(f"响应内容: {response.text}")
 
-        response.raise_for_status()
-        content_json = response.json()
+            response.raise_for_status()
+            content_json = response.json()
 
-        content = content_json['choices'][0]['message']['content']
-        match = re.search(r"```json\s*(.*?)\s*```", content, re.DOTALL)
-        if match:
-            json_str = match.group(1)
-        else:
-            json_str = content.strip()  
+            content = content_json['choices'][0]['message']['content']
+            match = re.search(r"```json\s*(.*?)\s*```", content, re.DOTALL)
+            if match:
+                json_str = match.group(1)
+            else:
+                json_str = content.strip()  
 
-        quintuples = json.loads(json_str)
-        logger.info(f"提取到的五元组: {quintuples}")
-        return [tuple(t) for t in quintuples if len(t) == 5]
+            quintuples = json.loads(json_str)
+            logger.info(f"提取到的五元组: {quintuples}")
+            return [tuple(t) for t in quintuples if len(t) == 5]
 
-    except Exception as e:
-        logger.error(f"调用 DeepSeek API 抽取五元组失败: {e}")
-        return []
+        except requests.exceptions.Timeout:
+            logger.warning(f"API调用超时 (第{attempt + 1}次尝试)")
+            if attempt < max_retries:
+                time.sleep(1)  # 重试前等待1秒
+                continue
+            else:
+                logger.error("所有重试都超时，放弃提取五元组")
+                return []
+        except Exception as e:
+            logger.error(f"调用 DeepSeek API 抽取五元组失败: {e}")
+            if attempt < max_retries:
+                time.sleep(1)
+                continue
+            else:
+                return []
+    
+    return []

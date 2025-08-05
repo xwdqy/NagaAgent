@@ -11,7 +11,7 @@
 ├── main.py                 # 主程序入口，负责流程调度、用户交互
 ├── quintuple_extractor.py  # 使用 DeepSeek API 进行五元组抽取
 ├── quintuple_graph.py      # 操作 Neo4j，存储与查询五元组
-├── quintuple_visualize.py  # 使用 PyVis 生成 graph.html 知识图谱可视化页面
+├── quintuple_visualize_v2.py  # 使用 PyVis 生成 graph.html 知识图谱可视化页面（解耦版本）
 ├── quintuple_rag_query.py  # 使用 DeepSeek 提取关键词并在图谱中检索答案
 ├── quintuples.json         # 持久化的五元组缓存文件
 ├── graph.html              # 可视化结果文件，自动生成

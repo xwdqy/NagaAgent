@@ -1,8 +1,9 @@
 import sys, os; sys.path.insert(0, os.path.abspath(os.path.dirname(__file__) + '/..'))
+from .styles.button_factory import ButtonFactory
 import sys, datetime
-from PyQt5.QtWidgets import QApplication, QWidget, QTextEdit, QSizePolicy, QGraphicsBlurEffect, QHBoxLayout, QLabel, QVBoxLayout, QStackedLayout, QPushButton, QStackedWidget, QDesktopWidget, QScrollArea, QSplitter, QGraphicsDropShadowEffect
+from PyQt5.QtWidgets import QApplication, QWidget, QTextEdit, QSizePolicy, QGraphicsBlurEffect, QHBoxLayout, QLabel, QVBoxLayout, QStackedLayout, QPushButton, QStackedWidget, QDesktopWidget, QScrollArea, QSplitter, QGraphicsDropShadowEffect, QFileDialog, QMessageBox
 from PyQt5.QtCore import Qt, QRect, QThread, pyqtSignal, QParallelAnimationGroup, QPropertyAnimation, QEasingCurve, QTimer
-from PyQt5.QtGui import QColor, QPainter, QBrush, QFont, QPixmap, QPalette, QPen
+from PyQt5.QtGui import QColor, QPainter, QBrush, QFont, QPixmap, QPalette, QPen, QIcon
 from conversation_core import NagaConversation
 import os
 from config import config # 导入统一配置
@@ -14,6 +15,11 @@ import asyncio
 import json
 import threading
 from PyQt5.QtCore import QObject, pyqtSignal as Signal
+import requests
+import shutil
+from pathlib import Path
+import time
+import os
 
 # 使用统一配置系统
 BG_ALPHA = config.ui.bg_alpha
@@ -226,7 +232,7 @@ class ChatWindow(QWidget):
         vlay.addWidget(s.progress_widget)
         
         s.input_wrap=QWidget(chat_area)
-        s.input_wrap.setFixedHeight(48)
+        s.input_wrap.setFixedHeight(60)  # 增加输入框包装器的高度，与字体大小匹配
         hlay=QHBoxLayout(s.input_wrap);hlay.setContentsMargins(0,0,0,0);hlay.setSpacing(8)
         s.prompt=QLabel('>',s.input_wrap)
         s.prompt.setStyleSheet(f"color:#fff;font:{fontsize}pt '{fontfam}';background:transparent;")
@@ -245,6 +251,15 @@ class ChatWindow(QWidget):
         s.input.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         s.input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
         hlay.addWidget(s.input)
+        
+        # 添加文档上传按钮
+        s.upload_btn = ButtonFactory.create_action_button("upload", s.input_wrap)
+        hlay.addWidget(s.upload_btn)
+        
+        # 添加心智云图按钮
+        s.mind_map_btn = ButtonFactory.create_action_button("mind_map", s.input_wrap)
+        hlay.addWidget(s.mind_map_btn)
+        
         vlay.addWidget(s.input_wrap,0)
         
         # 将聊天区域添加到分割器
@@ -310,7 +325,7 @@ class ChatWindow(QWidget):
         s.naga=NagaConversation()  # 第三次初始化：ChatWindow构造函数中创建
         s.worker=None
         s.full_img=0 # 立绘展开标志
-        s.streaming_mode = True  # 默认启用流式模式
+        s.streaming_mode = config.system.stream_mode  # 根据配置决定是否使用流式模式
         s.current_response = ""  # 当前响应缓冲
         s.animating = False  # 动画标志位，动画期间为True
         s._img_inited = False  # 标志变量，图片自适应只在初始化时触发一次
@@ -320,6 +335,13 @@ class ChatWindow(QWidget):
         
         s.input.textChanged.connect(s.adjust_input_height)
         s.input.installEventFilter(s)
+        
+        # 连接文档上传按钮
+        s.upload_btn.clicked.connect(s.upload_document)
+        
+        # 连接心智云图按钮
+        s.mind_map_btn.clicked.connect(s.open_mind_map)
+        
         s.setLayout(main)
         s.titlebar = TitleBar('NAGA AGENT', s)
         s.titlebar.setGeometry(0,0,s.width(),100)
@@ -400,7 +422,7 @@ class ChatWindow(QWidget):
     def adjust_input_height(s):
         doc = s.input.document()
         h = int(doc.size().height())+10
-        s.input.setFixedHeight(min(max(48, h), 120))
+        s.input.setFixedHeight(min(max(60, h), 150))  # 增加最小高度，与字体大小匹配
         s.input_wrap.setFixedHeight(s.input.height())
         
     def eventFilter(s, obj, event):
@@ -413,8 +435,39 @@ class ChatWindow(QWidget):
         from ui.response_utils import extract_message
         msg = extract_message(content)
         content_html = str(msg).replace('\\n', '\n').replace('\n', '<br>')
+        
+        # 添加消息到UI
         s.text.append(f"<span style='color:#fff;font-size:12pt;font-family:Lucida Console;'>{name}</span>")
         s.text.append(f"<span style='color:#fff;font-size:16pt;font-family:Lucida Console;'>{content_html}</span>")
+        
+        # 滚动到底部
+        s.text.verticalScrollBar().setValue(s.text.verticalScrollBar().maximum())
+        
+        # 返回消息的起始位置，用于后续更新
+        return len(s.text.toPlainText())
+    
+    def update_last_message(s, name, content):
+        """更新最后一条消息的内容"""
+        from ui.response_utils import extract_message
+        msg = extract_message(content)
+        content_html = str(msg).replace('\\n', '\n').replace('\n', '<br>')
+        
+        # 获取当前文本内容
+        current_text = s.text.toHtml()
+        
+        # 查找最后一个消息块并替换
+        lines = current_text.split('\n')
+        if len(lines) >= 2:
+            # 替换最后两个元素（名字和内容）
+            lines[-2] = f"<span style='color:#fff;font-size:12pt;font-family:Lucida Console;'>{name}</span>"
+            lines[-1] = f"<span style='color:#fff;font-size:16pt;font-family:Lucida Console;'>{content_html}</span>"
+            
+            # 重新组合HTML
+            updated_html = '\n'.join(lines)
+            s.text.setHtml(updated_html)
+            
+            # 滚动到底部
+            s.text.verticalScrollBar().setValue(s.text.verticalScrollBar().maximum())
     def on_send(s):
         u = s.input.toPlainText().strip()
         if u:
@@ -467,18 +520,35 @@ class ChatWindow(QWidget):
         s.worker.finished.connect(s.on_batch_response_finished)
     
     def append_response_chunk(s, chunk):
-        """追加响应片段（流式模式）"""
+        """追加响应片段（流式模式）- 实时显示"""
         s.current_response += chunk
-        # 实时更新显示（可选，避免过于频繁的更新）
-        # s.update_last_message("娜迦", s.current_response)
+        
+        # 实时更新显示 - 立即显示到UI
+        if not hasattr(s, '_current_message_id'):
+            # 第一次收到chunk时，创建新消息
+            s._current_message_id = s.add_user_message("娜迦", chunk)
+        else:
+            # 后续chunk，更新现有消息 - 立即更新
+            s.update_last_message("娜迦", s.current_response)
+            
+        # 强制UI更新
+        s.text.repaint()
     
     def finalize_streaming_response(s):
-        """完成流式响应"""
+        """完成流式响应 - 立即处理"""
         if s.current_response:
             # 对累积的完整响应进行消息提取（多步自动\n分隔）
             from ui.response_utils import extract_message
             final_message = extract_message(s.current_response)
-            s.add_user_message("娜迦", final_message)
+            
+            # 更新最终消息
+            if hasattr(s, '_current_message_id'):
+                s.update_last_message("娜迦", final_message)
+                delattr(s, '_current_message_id')
+            else:
+                s.add_user_message("娜迦", final_message)
+        
+        # 立即停止加载状态
         s.progress_widget.stop_loading()
     
     def on_response_finished(s, response):
@@ -736,6 +806,199 @@ class ChatWindow(QWidget):
                 if os.path.exists(p) and not q.isNull():
                     s.img.setPixmap(q.scaled(s.img.width(), s.img.height(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
             s._img_inited = True
+
+    def upload_document(s):
+        """上传文档功能"""
+        try:
+            # 打开文件选择对话框
+            file_path, _ = QFileDialog.getOpenFileName(
+                s,
+                "选择要上传的文档",
+                "",
+                "支持的文档格式 (*.docx *.txt *.md);;Word文档 (*.docx);;文本文件 (*.txt);;Markdown文件 (*.md);;所有文件 (*)"
+            )
+            
+            if not file_path:
+                return  # 用户取消选择
+            
+            # 检查文件格式
+            file_ext = Path(file_path).suffix.lower()
+            supported_formats = ['.docx', '.txt', '.md']
+            
+            if file_ext not in supported_formats:
+                QMessageBox.warning(s, "格式不支持", 
+                                   f"不支持的文件格式: {file_ext}\n\n支持的格式: {', '.join(supported_formats)}")
+                return
+            
+            # 检查文件大小 (限制为10MB)
+            file_size = os.path.getsize(file_path)
+            if file_size > 10 * 1024 * 1024:  # 10MB
+                QMessageBox.warning(s, "文件过大", "文件大小不能超过10MB")
+                return
+            
+            # 上传文件到API服务器
+            s.upload_file_to_server(file_path)
+            
+        except Exception as e:
+            QMessageBox.critical(s, "上传错误", f"文档上传失败:\n{str(e)}")
+    
+    def upload_file_to_server(s, file_path):
+        """将文件上传到API服务器"""
+        try:
+            # 显示上传进度
+            s.add_user_message("系统", f"📤 正在上传文档: {Path(file_path).name}")
+            s.progress_widget.set_thinking_mode()
+            s.progress_widget.status_label.setText("上传文档中...")
+            
+            # 准备上传数据
+            api_url = "http://localhost:8000/upload/document"
+            
+            with open(file_path, 'rb') as f:
+                files = {'file': (Path(file_path).name, f, 'application/octet-stream')}
+                data = {'description': f'通过NAGA聊天界面上传的文档'}
+                
+                # 发送上传请求
+                response = requests.post(api_url, files=files, data=data, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                s.progress_widget.stop_loading()
+                s.add_user_message("系统", f"✅ 文档上传成功: {result['filename']}")
+                
+                # 询问用户想要进行什么操作
+                s.show_document_options(result['file_path'], result['filename'])
+            else:
+                s.progress_widget.stop_loading()
+                s.add_user_message("系统", f"❌ 上传失败: {response.text}")
+                
+        except requests.exceptions.ConnectionError:
+            s.progress_widget.stop_loading()
+            s.add_user_message("系统", "❌ 无法连接到API服务器，请确保服务器正在运行")
+        except Exception as e:
+            s.progress_widget.stop_loading()
+            s.add_user_message("系统", f"❌ 上传失败: {str(e)}")
+    
+    def show_document_options(s, file_path, filename):
+        """显示文档处理选项"""
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QFrame, QPushButton
+        from PyQt5.QtCore import Qt
+        from PyQt5.QtGui import QFont
+        
+        dialog = QDialog(s)
+        dialog.setWindowTitle("文档处理选项")
+        dialog.setFixedSize(650, 480)
+        # 隐藏标题栏的图标按钮
+        dialog.setWindowFlags(Qt.Dialog | Qt.CustomizeWindowHint | Qt.WindowTitleHint)
+        dialog.setStyleSheet("""
+            QDialog {
+                background-color: white;
+                border: 2px solid #ddd;
+                border-radius: 10px;
+            }
+        """)
+        
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(30, 25, 30, 25)
+        layout.setSpacing(20)
+        
+        # 标题
+        title_label = QLabel("文档上传成功")
+        title_font = QFont("Microsoft YaHei", 16, QFont.Bold)
+        title_label.setFont(title_font)
+        title_label.setStyleSheet("color: #2c3e50; margin-bottom: 25px; padding: 15px; min-height: 40px;")
+        title_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title_label)
+        
+        # 文件信息
+        info_label = QLabel(f"文件名: {filename}")
+        info_label.setStyleSheet("color: #34495e; font-size: 14px; padding: 10px;")
+        layout.addWidget(info_label)
+        
+        # 分隔线
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setStyleSheet("background-color: #bdc3c7;")
+        layout.addWidget(line)
+        
+        # 操作按钮
+        actions = [
+            ("📖 读取内容", "read", "读取文档的完整内容"),
+            ("🔍 分析文档", "analyze", "分析文档结构和内容"),
+            ("📝 生成摘要", "summarize", "生成文档的简洁摘要")
+        ]
+        
+        for btn_text, action, description in actions:
+            btn = ButtonFactory.create_document_action_button(btn_text)
+            
+            # 添加描述标签
+            desc_label = QLabel(description)
+            desc_label.setStyleSheet("color: #7f8c8d; font-size: 12px; margin-bottom: 10px;")
+            layout.addWidget(desc_label)
+            layout.addWidget(btn)
+            
+            # 连接按钮事件
+            btn.clicked.connect(lambda checked, f=file_path, a=action, d=dialog: s.process_document(f, a, d))
+        
+        # 取消按钮
+        cancel_btn = ButtonFactory.create_cancel_button()
+        cancel_btn.clicked.connect(dialog.close)
+        layout.addWidget(cancel_btn)
+        
+        dialog.exec_()
+    
+    def process_document(s, file_path, action, dialog=None):
+        """处理文档"""
+        if dialog:
+            dialog.close()
+        
+        try:
+            s.add_user_message("系统", f"🔄 正在处理文档: {Path(file_path).name}")
+            s.progress_widget.set_thinking_mode()
+            s.progress_widget.status_label.setText("处理文档中...")
+            
+            # 调用API处理文档
+            api_url = "http://localhost:8000/document/process"
+            data = {
+                "file_path": file_path,
+                "action": action
+            }
+            
+            response = requests.post(api_url, json=data, timeout=60)
+            
+            if response.status_code == 200:
+                result = response.json()
+                s.progress_widget.stop_loading()
+                
+                if action == "read":
+                    s.add_user_message("娜迦", f"📖 文档内容:\n\n{result['content']}")
+                elif action == "analyze":
+                    s.add_user_message("娜迦", f"🔍 文档分析:\n\n{result['analysis']}")
+                elif action == "summarize":
+                    s.add_user_message("娜迦", f"📝 文档摘要:\n\n{result['summary']}")
+            else:
+                s.progress_widget.stop_loading()
+                s.add_user_message("系统", f"❌ 文档处理失败: {response.text}")
+                
+        except requests.exceptions.ConnectionError:
+            s.progress_widget.stop_loading()
+            s.add_user_message("系统", "❌ 无法连接到API服务器，请确保服务器正在运行")
+        except Exception as e:
+            s.progress_widget.stop_loading()
+            s.add_user_message("系统", f"❌ 文档处理失败: {str(e)}")
+    
+    def open_mind_map(s):
+        """打开心智云图"""
+        try:
+            # 检查是否存在知识图谱文件
+            graph_file = "logs/knowledge_graph/graph.html"
+            if os.path.exists(graph_file):
+                import webbrowser
+                webbrowser.open(graph_file)
+                s.add_user_message("系统", "🧠 心智云图已打开")
+            else:
+                s.add_user_message("系统", "❌ 未找到心智云图文件，请先生成知识图谱")
+        except Exception as e:
+            s.add_user_message("系统", f"❌ 打开心智云图失败: {str(e)}")
 
 if __name__=="__main__":
     app = QApplication(sys.argv)

@@ -11,8 +11,10 @@ import traceback
 import re
 import os
 import logging
+import uuid
+import time
 from contextlib import asynccontextmanager
-from typing import Dict, List, Optional, AsyncGenerator
+from typing import Dict, List, Optional, AsyncGenerator, Any
 
 # 在导入其他模块前先设置HTTP库日志级别
 logging.getLogger("httpcore.http11").setLevel(logging.WARNING)
@@ -20,22 +22,28 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore.connection").setLevel(logging.WARNING)
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse
 from fastapi import WebSocket, WebSocketDisconnect
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import aiohttp
+import shutil
+from pathlib import Path
 
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 导入独立的工具调用模块
 from .tool_call_utils import parse_tool_calls, execute_tool_calls, tool_call_loop
+from .message_manager import message_manager  # 导入统一的消息管理器
+from .prompt_logger import prompt_logger  # 导入prompt日志记录器
 
 # 导入配置系统
 from config import config  # 使用新的配置系统
 from ui.response_utils import extract_message  # 导入消息提取工具
+from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX  # handoff提示词
 
 # 全局NagaAgent实例 - 延迟导入避免循环依赖
 naga_agent = None
@@ -105,6 +113,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 挂载静态文件
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
 # 请求模型
 class ChatRequest(BaseModel):
     message: str
@@ -126,6 +138,20 @@ class SystemInfoResponse(BaseModel):
     status: str
     available_services: List[str]
     api_key_configured: bool
+
+class FileUploadResponse(BaseModel):
+    filename: str
+    file_path: str
+    file_size: int
+    file_type: str
+    upload_time: str
+    status: str = "success"
+    message: str = "文件上传成功"
+
+class DocumentProcessRequest(BaseModel):
+    file_path: str
+    action: str = "read"  # read, analyze, summarize
+    session_id: Optional[str] = None
 
 # WebSocket路由
 @app.websocket("/ws/mcplog")
@@ -206,17 +232,31 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=400, detail="消息内容不能为空")
     
     try:
-        # 构建消息
-        messages = [
-            {"role": "user", "content": request.message}
-        ]
+        # 获取或创建会话ID
+        session_id = message_manager.create_session(request.session_id)
+        
+        # 构建系统提示词
+        system_prompt = f"{RECOMMENDED_PROMPT_PREFIX}\n{config.prompts.naga_system_prompt}"
+        available_services = naga_agent.mcp.get_available_services_filtered()
+        services_text = naga_agent._format_services_for_prompt(available_services)
+        system_prompt = system_prompt.format(**services_text)
+        
+        # 使用消息管理器构建完整的对话消息
+        messages = message_manager.build_conversation_messages(
+            session_id=session_id,
+            system_prompt=system_prompt,
+            current_message=request.message
+        )
         
         # 定义LLM调用函数
         async def call_llm(messages: List[Dict]) -> Dict:
             """调用LLM API"""
             async with aiohttp.ClientSession() as session:
+                # 保存prompt日志
+                prompt_logger.log_prompt(session_id, messages, api_status="sending")
+                
                 async with session.post(
-                    f"{config.api.base_url}/v1/chat/completions",
+                    f"{config.api.base_url}/chat/completions",
                     headers={
                         "Authorization": f"Bearer {config.api.api_key}",
                         "Content-Type": "application/json"
@@ -230,9 +270,13 @@ async def chat(request: ChatRequest):
                     }
                 ) as resp:
                     if resp.status != 200:
+                        # 保存失败的prompt日志
+                        prompt_logger.log_prompt(session_id, messages, api_status="failed")
                         raise HTTPException(status_code=resp.status, detail="LLM API调用失败")
                     
                     data = await resp.json()
+                    # 保存成功的prompt日志
+                    prompt_logger.log_prompt(session_id, messages, data, api_status="success")
                     return {
                         'content': data['choices'][0]['message']['content'],
                         'status': 'success'
@@ -244,9 +288,13 @@ async def chat(request: ChatRequest):
         # 提取最终响应
         response_text = result['content']
         
+        # 保存对话历史到消息管理器
+        message_manager.add_message(session_id, "user", request.message)
+        message_manager.add_message(session_id, "assistant", response_text)
+        
         return ChatResponse(
             response=extract_message(response_text) if response_text else response_text,
-            session_id=request.session_id,
+            session_id=session_id,
             status="success"
         )
     except Exception as e:
@@ -265,17 +313,34 @@ async def chat_stream(request: ChatRequest):
     
     async def generate_response() -> AsyncGenerator[str, None]:
         try:
-            # 构建消息
-            messages = [
-                {"role": "user", "content": request.message}
-            ]
+            # 获取或创建会话ID
+            session_id = message_manager.create_session(request.session_id)
+            
+            # 发送会话ID信息
+            yield f"data: session_id: {session_id}\n\n"
+            
+            # 构建系统提示词
+            system_prompt = f"{RECOMMENDED_PROMPT_PREFIX}\n{config.prompts.naga_system_prompt}"
+            available_services = naga_agent.mcp.get_available_services_filtered()
+            services_text = naga_agent._format_services_for_prompt(available_services)
+            system_prompt = system_prompt.format(**services_text)
+            
+            # 使用消息管理器构建完整的对话消息
+            messages = message_manager.build_conversation_messages(
+                session_id=session_id,
+                system_prompt=system_prompt,
+                current_message=request.message
+            )
             
             # 定义LLM调用函数
             async def call_llm(messages: List[Dict]) -> Dict:
                 """调用LLM API"""
                 async with aiohttp.ClientSession() as session:
+                    # 保存prompt日志
+                    prompt_logger.log_prompt(session_id, messages, api_status="sending")
+                    
                     async with session.post(
-                        f"{config.api.base_url}/v1/chat/completions",
+                        f"{config.api.base_url}/chat/completions",
                         headers={
                             "Authorization": f"Bearer {config.api.api_key}",
                             "Content-Type": "application/json"
@@ -289,9 +354,13 @@ async def chat_stream(request: ChatRequest):
                         }
                     ) as resp:
                         if resp.status != 200:
+                            # 保存失败的prompt日志
+                            prompt_logger.log_prompt(session_id, messages, api_status="failed")
                             raise HTTPException(status_code=resp.status, detail="LLM API调用失败")
                         
                         data = await resp.json()
+                        # 保存成功的prompt日志
+                        prompt_logger.log_prompt(session_id, messages, data, api_status="success")
                         return {
                             'content': data['choices'][0]['message']['content'],
                             'status': 'success'
@@ -305,6 +374,10 @@ async def chat_stream(request: ChatRequest):
             for line in final_content.splitlines():
                 if line.strip():
                     yield f"data: {line}\n\n"
+            
+            # 保存对话历史到消息管理器
+            message_manager.add_message(session_id, "user", request.message)
+            message_manager.add_message(session_id, "assistant", final_content)
             
             yield "data: [DONE]\n\n"
             
@@ -330,6 +403,9 @@ async def mcp_handoff(request: MCPRequest):
         raise HTTPException(status_code=503, detail="NagaAgent未初始化")
     
     try:
+        # 获取或创建会话ID
+        session_id = message_manager.get_or_create_session(request.session_id)
+        
         # 直接调用MCP handoff
         result = await naga_agent.mcp.handoff(
             service_name=request.service_name,
@@ -339,7 +415,7 @@ async def mcp_handoff(request: MCPRequest):
         return {
             "status": "success",
             "result": result,
-            "session_id": request.session_id
+            "session_id": session_id  # 使用生成的会话ID
         }
     except Exception as e:
         print(f"MCP handoff错误: {e}")
@@ -476,16 +552,281 @@ async def get_memory_stats():
         raise HTTPException(status_code=503, detail="NagaAgent未初始化")
     
     try:
-        # 这里可以添加记忆统计逻辑
-        return {
-            "status": "success",
-            "memory_manager_ready": naga_agent.memory is not None,
-            "message": "记忆管理器已就绪"
-        }
+        if hasattr(naga_agent, 'memory_manager') and naga_agent.memory_manager:
+            stats = naga_agent.memory_manager.get_memory_stats()
+            return {
+                "status": "success",
+                "memory_stats": stats
+            }
+        else:
+            return {
+                "status": "success",
+                "memory_stats": {"enabled": False, "message": "记忆系统未启用"}
+            }
     except Exception as e:
         print(f"获取记忆统计错误: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"获取记忆统计失败: {str(e)}")
+
+@app.get("/sessions")
+async def get_sessions():
+    """获取所有会话信息"""
+    try:
+        # 清理过期会话
+        message_manager.cleanup_old_sessions()
+        
+        # 获取所有会话信息
+        sessions_info = message_manager.get_all_sessions_info()
+        
+        return {
+            "status": "success",
+            "sessions": sessions_info,
+            "total_sessions": len(sessions_info)
+        }
+    except Exception as e:
+        print(f"获取会话信息错误: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"获取会话信息失败: {str(e)}")
+
+@app.get("/sessions/{session_id}")
+async def get_session_detail(session_id: str):
+    """获取指定会话的详细信息"""
+    try:
+        session_info = message_manager.get_session_info(session_id)
+        if not session_info:
+            raise HTTPException(status_code=404, detail="会话不存在")
+        
+        return {
+            "status": "success",
+            "session_id": session_id,
+            "session_info": session_info,
+            "messages": message_manager.get_messages(session_id),
+            "conversation_rounds": session_info["conversation_rounds"]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"获取会话详情错误: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"获取会话详情失败: {str(e)}")
+
+@app.delete("/sessions/{session_id}")
+async def delete_session(session_id: str):
+    """删除指定会话"""
+    try:
+        success = message_manager.delete_session(session_id)
+        if success:
+            return {
+                "status": "success",
+                "message": f"会话 {session_id} 已删除"
+            }
+        else:
+            raise HTTPException(status_code=404, detail="会话不存在")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"删除会话错误: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"删除会话失败: {str(e)}")
+
+@app.delete("/sessions")
+async def clear_all_sessions():
+    """清空所有会话"""
+    try:
+        count = message_manager.clear_all_sessions()
+        return {
+            "status": "success",
+            "message": f"已清空 {count} 个会话"
+        }
+    except Exception as e:
+        print(f"清空会话错误: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"清空会话失败: {str(e)}")
+
+# 文件上传和文档处理接口
+@app.post("/upload/document", response_model=FileUploadResponse)
+async def upload_document(
+    file: UploadFile = File(...),
+    description: str = Form(None)
+):
+    """上传文档文件"""
+    try:
+        # 创建上传目录
+        upload_dir = Path("uploaded_documents")
+        upload_dir.mkdir(exist_ok=True)
+        
+        # 检查文件类型
+        allowed_extensions = {".docx", ".doc", ".txt", ".pdf", ".md"}
+        file_extension = Path(file.filename).suffix.lower()
+        
+        if file_extension not in allowed_extensions:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"不支持的文件类型: {file_extension}。支持的类型: {', '.join(allowed_extensions)}"
+            )
+        
+        # 生成唯一文件名
+        import time
+        timestamp = str(int(time.time()))
+        safe_filename = f"{timestamp}_{file.filename}"
+        file_path = upload_dir / safe_filename
+        
+        # 保存文件
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # 获取文件信息
+        file_size = file_path.stat().st_size
+        upload_time = time.strftime("%Y-%m-%d %H:%M:%S")
+        
+        return FileUploadResponse(
+            filename=file.filename,
+            file_path=str(file_path),
+            file_size=file_size,
+            file_type=file_extension,
+            upload_time=upload_time,
+            message=f"文件 '{file.filename}' 上传成功"
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"文件上传失败: {str(e)}")
+
+@app.post("/document/process")
+async def process_document(request: DocumentProcessRequest):
+    """处理上传的文档"""
+    if not naga_agent:
+        raise HTTPException(status_code=503, detail="NagaAgent未初始化")
+    
+    try:
+        file_path = Path(request.file_path)
+        
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail=f"文件不存在: {request.file_path}")
+        
+        # 根据文件类型和操作类型处理文档
+        if file_path.suffix.lower() == ".docx":
+            # 使用Word MCP服务处理
+            mcp_request = {
+                "service_name": "office_word_mcp",
+                "task": {
+                    "tool_name": "get_document_text",
+                    "filename": str(file_path)
+                }
+            }
+            
+            # 调用MCP服务
+            result = await naga_agent.mcp.handoff(mcp_request["service_name"], mcp_request["task"])
+            
+            if request.action == "read":
+                return {
+                    "status": "success",
+                    "action": "read",
+                    "file_path": request.file_path,
+                    "content": result,
+                    "message": "文档内容读取成功"
+                }
+            elif request.action == "analyze":
+                # 让NAGA分析文档内容
+                analysis_prompt = f"请分析以下文档内容，提供结构化的分析报告：\n\n{result}"
+                analysis_result = await naga_agent.get_response(analysis_prompt)
+                
+                return {
+                    "status": "success",
+                    "action": "analyze",
+                    "file_path": request.file_path,
+                    "analysis": analysis_result,
+                    "message": "文档分析完成"
+                }
+            elif request.action == "summarize":
+                # 让NAGA总结文档内容
+                summary_prompt = f"请总结以下文档内容，提供简洁的摘要：\n\n{result}"
+                summary_result = await naga_agent.get_response(summary_prompt)
+                
+                return {
+                    "status": "success",
+                    "action": "summarize",
+                    "file_path": request.file_path,
+                    "summary": summary_result,
+                    "message": "文档总结完成"
+                }
+        else:
+            # 处理其他文件类型
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            if request.action == "read":
+                return {
+                    "status": "success",
+                    "action": "read",
+                    "file_path": request.file_path,
+                    "content": content,
+                    "message": "文档内容读取成功"
+                }
+            elif request.action == "analyze":
+                analysis_prompt = f"请分析以下文档内容，提供结构化的分析报告：\n\n{content}"
+                analysis_result = await naga_agent.get_response(analysis_prompt)
+                
+                return {
+                    "status": "success",
+                    "action": "analyze",
+                    "file_path": request.file_path,
+                    "analysis": analysis_result,
+                    "message": "文档分析完成"
+                }
+            elif request.action == "summarize":
+                summary_prompt = f"请总结以下文档内容，提供简洁的摘要：\n\n{content}"
+                summary_result = await naga_agent.get_response(summary_prompt)
+                
+                return {
+                    "status": "success",
+                    "action": "summarize",
+                    "file_path": request.file_path,
+                    "summary": summary_result,
+                    "message": "文档总结完成"
+                }
+        
+    except Exception as e:
+        print(f"文档处理错误: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"文档处理失败: {str(e)}")
+
+@app.get("/documents/list")
+async def list_uploaded_documents():
+    """获取已上传的文档列表"""
+    try:
+        upload_dir = Path("uploaded_documents")
+        if not upload_dir.exists():
+            return {
+                "status": "success",
+                "documents": [],
+                "total": 0
+            }
+        
+        documents = []
+        for file_path in upload_dir.iterdir():
+            if file_path.is_file():
+                stat = file_path.stat()
+                documents.append({
+                    "filename": file_path.name,
+                    "file_path": str(file_path),
+                    "file_size": stat.st_size,
+                    "file_type": file_path.suffix.lower(),
+                    "upload_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(stat.st_mtime))
+                })
+        
+        # 按上传时间排序
+        documents.sort(key=lambda x: x["upload_time"], reverse=True)
+        
+        return {
+            "status": "success",
+            "documents": documents,
+            "total": len(documents)
+        }
+        
+    except Exception as e:
+        print(f"获取文档列表错误: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"获取文档列表失败: {str(e)}")
 
 if __name__ == "__main__":
     import argparse

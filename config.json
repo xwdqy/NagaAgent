@@ -2,9 +2,10 @@
   "system": {
     "version": "3.0",
     "voice_enabled": true,
-    "stream_mode": true,
+    "stream_mode": false,
     "debug": true,
-    "log_level": "DEBUG"
+    "log_level": "DEBUG",
+    "save_prompts": true
   },
   "api": {
     "api_key": " ",
@@ -28,8 +29,11 @@
     "similarity_threshold": 0.6,
     "neo4j_uri": "neo4j://127.0.0.1:7687",
     "neo4j_user": "neo4j",
-    "neo4j_password": " ",
-    "neo4j_database": "neo4j"
+    "neo4j_password": "Xx2017105",
+    "neo4j_database": "neo4j",
+    "extraction_timeout": 12,
+    "extraction_retries": 2,
+    "base_timeout": 15
   },
   "handoff": {
     "max_loop_stream": 5,
@@ -67,23 +71,23 @@
     "max_retries": 2
   },
   "weather": {
-    "api_key": " "
+    "api_key": "06e5619c6e787a67ae4b9f177ab48fe2"
   },
   "mqtt": {
     "enabled": true,
     "broker": " ",
-    "port": 1883,
+    "port": 1878,
     "topic": " ",
     "client_id": " ",
-    "username": "E6UtPoMxRw7iDKzQuBVE&k28x9wMnNss",
+    "username": " ",
     "password": "6d43c5dd91a0f19517bd72161de90ba09f568db8b2655fa9a2bf714f046adb1d",
     "keepalive": 60,
     "qos": 1
   },
   "ui": {
     "user_name": "用户",
-    "bg_alpha": 0.5,
-    "window_bg_alpha": 110,
+    "bg_alpha": 0.81,
+    "window_bg_alpha": 100,
     "mac_btn_size": 36,
     "mac_btn_margin": 16,
     "mac_btn_gap": 12,

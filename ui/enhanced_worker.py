@@ -180,13 +180,19 @@ class StreamingWorker(EnhancedWorker):
                         content_str = str(content)
                         result_chunks.append(content_str)
                         
-                        # 发送流式数据到前端
+                        # 立即发送流式数据到前端显示
                         self.stream_chunk.emit(content_str)
                         
-                        # 发送文本到语音集成模块
+                        # 异步发送文本到语音集成模块（不阻塞前端显示）
                         if self.voice_integration:
                             try:
-                                self.voice_integration.receive_text_chunk(content_str)
+                                # 使用线程池异步处理音频，不阻塞UI
+                                import threading
+                                threading.Thread(
+                                    target=self.voice_integration.receive_text_chunk,
+                                    args=(content_str,),
+                                    daemon=True
+                                ).start()
                             except Exception as e:
                                 print(f"语音集成错误: {e}")
                         
@@ -198,17 +204,21 @@ class StreamingWorker(EnhancedWorker):
                     result_chunks.append(content_str)
                     self.stream_chunk.emit(content_str)
                     
-                    # 发送文本到语音集成模块
+                    # 异步发送文本到语音集成模块
                     if self.voice_integration:
                         try:
-                            self.voice_integration.receive_text_chunk(content_str)
+                            threading.Thread(
+                                target=self.voice_integration.receive_text_chunk,
+                                args=(content_str,),
+                                daemon=True
+                            ).start()
                         except Exception as e:
                             print(f"语音集成错误: {e}")
                     
                     self.streaming_buffer += content_str
                     word_count += len(content_str)
                 
-                # 动态更新状态
+                # 动态更新状态 - 优化显示逻辑
                 if word_count < 50:
                     status = "开始回复..."
                     progress = 35
@@ -219,25 +229,31 @@ class StreamingWorker(EnhancedWorker):
                     status = "完善回答内容..."
                     progress = 70
                 else:
-                    status = "整理最终回复..."
+                    status = "继续生成..."
                     progress = 85
                     
                 self.progress_updated.emit(progress, f"{status} ({word_count}字)")
                 
-                # 短暂休眠让UI更新
-                await asyncio.sleep(0.005)
+                # 减少休眠时间，提升响应速度
+                await asyncio.sleep(0.001)
             
             if not self.is_cancelled:
-                # 发送最终完整文本到语音集成模块
+                # 立即发送完成信号，不等待音频处理
+                self.stream_complete.emit()
+                
+                # 异步发送最终完整文本到语音集成模块（不阻塞前端）
                 if self.voice_integration:
                     try:
                         final_text = ''.join(result_chunks)
-                        self.voice_integration.receive_final_text(final_text)
+                        # 使用线程池异步处理，确保前端立即显示
+                        import threading
+                        threading.Thread(
+                            target=self.voice_integration.receive_final_text,
+                            args=(final_text,),
+                            daemon=True
+                        ).start()
                     except Exception as e:
                         print(f"语音集成错误: {e}")
-                
-                # 流式完成
-                self.stream_complete.emit()
                 
                 elapsed = time.time() - start_time
                 self.status_changed.emit(f"回复完成 (用时 {elapsed:.1f}s，{word_count}字)")
@@ -290,11 +306,17 @@ class BatchWorker(EnhancedWorker):
                     result_chunks.append(str(chunk))
             
             if not self.is_cancelled:
-                # 发送最终完整文本到语音集成模块
+                # 异步发送最终完整文本到语音集成模块（不阻塞前端）
                 if self.voice_integration:
                     try:
                         final_text = ''.join(result_chunks)
-                        self.voice_integration.receive_final_text(final_text)
+                        # 使用线程池异步处理，确保前端立即显示
+                        import threading
+                        threading.Thread(
+                            target=self.voice_integration.receive_final_text,
+                            args=(final_text,),
+                            daemon=True
+                        ).start()
                     except Exception as e:
                         print(f"语音集成错误: {e}")
                 
