@@ -60,7 +60,7 @@ logger = logging.getLogger("NagaConversation")
 # _MCP_HANDOFF_REGISTERED=False  # 已移除，不再需要
 _TREE_THINKING_SUBSYSTEMS_INITIALIZED=False
 _MCP_SERVICES_INITIALIZED=False
-_QUICK_MODEL_MANAGER_INITIALIZED=False
+
 _VOICE_ENABLED_LOGGED=False
 
 class NagaConversation: # 对话主类
@@ -115,27 +115,7 @@ class NagaConversation: # 对话主类
                 logger.warning(f"树状思考系统实例创建失败: {e}")
                 self.tree_thinking = None
         
-        # 初始化快速模型管理器（用于异步思考判断）
-        self.quick_model_manager = None
-        # 集成快速模型管理器（参考树状思考的全局变量保护机制）
-        global _QUICK_MODEL_MANAGER_INITIALIZED
-        if not _QUICK_MODEL_MANAGER_INITIALIZED:
-            try:
-                from thinking.quick_model_manager import QuickModelManager
-                self.quick_model_manager = QuickModelManager()
-                logger.info("快速模型管理器初始化成功")
-                _QUICK_MODEL_MANAGER_INITIALIZED = True
-            except Exception as e:
-                logger.debug(f"快速模型管理器初始化失败: {e}")
-                self.quick_model_manager = None
-        else:
-            # 如果已经初始化过，创建新实例但不重新初始化（静默处理）
-            try:
-                from thinking.quick_model_manager import QuickModelManager
-                self.quick_model_manager = QuickModelManager()
-            except Exception as e:
-                logger.debug(f"快速模型管理器实例创建失败: {e}")
-                self.quick_model_manager = None
+
 
     def _init_mcp_services(self):
         """初始化MCP服务系统（只在首次初始化时输出日志，后续静默）"""

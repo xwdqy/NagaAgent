@@ -108,6 +108,18 @@ class GRAGConfig(BaseModel):
     neo4j_user: str = Field(default="neo4j", description="Neo4j用户名")
     neo4j_password: str = Field(default="your_password", description="Neo4j密码")
     neo4j_database: str = Field(default="neo4j", description="Neo4j数据库名")
+    
+    # 任务管理器配置
+    task_manager_enabled: bool = Field(default=True, description="是否启用任务管理器")
+    max_workers: int = Field(default=3, ge=1, le=10, description="最大并发工作线程数")
+    max_queue_size: int = Field(default=100, ge=10, le=1000, description="最大任务队列大小")
+    task_timeout: int = Field(default=30, ge=5, le=300, description="单个任务超时时间（秒）")
+    auto_cleanup_hours: int = Field(default=24, ge=1, le=168, description="自动清理任务保留时间（小时）")
+    
+    # 兼容旧版本的字段
+    extraction_timeout: Optional[int] = Field(default=None, description="提取超时时间（秒）")
+    extraction_retries: Optional[int] = Field(default=None, description="提取重试次数")
+    base_timeout: Optional[int] = Field(default=None, description="基础超时时间（秒）")
 
 
 class HandoffConfig(BaseModel):
@@ -234,24 +246,7 @@ class TTSConfig(BaseModel):
     keep_audio_files: bool = Field(default=False, description="是否保留音频文件用于调试")
 
 
-class QuickModelConfig(BaseModel):
-    """快速响应小模型配置"""
-    enabled: bool = Field(default=False, description="是否启用小模型")  # 关闭小模型
-    api_key: str = Field(default="", description="小模型API密钥")
-    base_url: str = Field(default="", description="小模型API地址")
-    model_name: str = Field(default="qwen2.5-1.5b-instruct", description="小模型名称")
-    max_tokens: int = Field(default=512, ge=1, le=2048, description="小模型输出限制")
-    temperature: float = Field(default=0.05, ge=0.0, le=1.0, description="小模型温度")
-    timeout: int = Field(default=5, ge=1, le=60, description="快速响应超时时间")
-    max_retries: int = Field(default=2, ge=0, le=5, description="最大重试次数")
 
-    # 功能开关 - 全部关闭
-    quick_decision_enabled: bool = Field(default=False, description="快速决策功能")  # 关闭
-    json_format_enabled: bool = Field(default=False, description="JSON格式化功能")  # 关闭
-    output_filter_enabled: bool = Field(default=False, description="输出内容过滤功能")  # 关闭
-    difficulty_judgment_enabled: bool = Field(default=False, description="问题难度判断功能")  # 关闭
-    scoring_system_enabled: bool = Field(default=False, description="黑白名单打分系统")  # 关闭
-    thinking_completeness_enabled: bool = Field(default=False, description="思考完整性判断功能")  # 关闭
 
 
 class FilterConfig(BaseModel):
@@ -404,58 +399,6 @@ Agent服务：
         description="娜迦系统提示词"
     )
 
-    quick_decision_prompt: str = Field(
-        default="""你是一个快速决策助手，专门进行简单判断和分类任务。
-请根据用户输入快速给出准确的判断结果，保持简洁明确。
-不需要详细解释，只需要给出核心判断结果。
-【重要】：只输出最终结果，不要包含思考过程或<think>标签。""",
-        description="快速决策系统提示词"
-    )
-
-    json_format_prompt: str = Field(
-        default="""你是一个JSON格式化助手，专门将文本内容转换为结构化JSON格式。
-请严格按照要求的JSON格式输出，确保语法正确且结构清晰。
-只输出JSON内容，不要包含任何其他文字说明。
-【重要】：只输出最终JSON，不要包含思考过程或<think>标签。""",
-        description="JSON格式化系统提示词"
-    )
-
-    difficulty_judgment_prompt: str = Field(
-        default="""你是一个问题难度评估专家，专门分析问题的复杂程度。
-请根据问题的概念复杂度、推理深度、知识广度、计算复杂度、创新要求等因素进行评估。
-只输出难度等级：简单、中等、困难、极难 中的一个。
-【重要】：只输出难度等级，不要包含思考过程或解释。""",
-        description="问题难度判断系统提示词"
-    )
-
-    result_scoring_prompt: str = Field(
-        default="""你是一个结果评分专家，根据用户偏好和思考质量对结果进行1-5分评分。
-评分标准：
-- 5分：完全符合用户偏好，质量极高
-- 4分：很好符合偏好，质量良好  
-- 3分：基本符合偏好，质量一般
-- 2分：部分符合偏好，质量较差
-- 1分：不符合偏好或质量很差
-
-请根据提供的思考结果和用户偏好进行评分。
-【重要】：只输出数字分数，不要包含思考过程或解释。""",
-        description="结果打分系统提示词"
-    )
-
-    thinking_completeness_prompt: str = Field(
-        default="""你是一个思考完整性评估专家，判断当前思考是否已经相对完整。
-评估标准：
-- 问题分析是否充分
-- 解决方案是否明确
-- 逻辑链条是否完整
-- 结论是否清晰合理
-
-如果思考完整，输出：完整
-如果需要进一步思考，输出：不完整
-【重要】：只输出"完整"或"不完整"，不要包含思考过程或解释。""",
-        description="思考完整性判断系统提示词"
-    )
-
     next_question_prompt: str = Field(
         default="""你是一个问题设计专家，根据当前不完整的思考结果，设计下一级需要深入思考的核心问题。
 要求：
@@ -479,7 +422,7 @@ class NagaConfig(BaseModel):
     mcp: MCPConfig = Field(default_factory=MCPConfig)
     browser: BrowserConfig = Field(default_factory=BrowserConfig)
     tts: TTSConfig = Field(default_factory=TTSConfig)
-    quick_model: QuickModelConfig = Field(default_factory=QuickModelConfig)
+
     filter: FilterConfig = Field(default_factory=FilterConfig)
     difficulty: DifficultyConfig = Field(default_factory=DifficultyConfig)
     scoring: ScoringConfig = Field(default_factory=ScoringConfig)
@@ -505,25 +448,7 @@ class NagaConfig(BaseModel):
             print("警告：API密钥未配置")
             print("请在 config.json 文件中设置正确的 api.api_key 值")
 
-    @property
-    def quick_model_config_dict(self) -> Dict[str, Any]:
-        """返回快速模型配置字典，兼容旧版本"""
-        return {
-            "enabled": self.quick_model.enabled,
-            "api_key": self.quick_model.api_key,
-            "base_url": self.quick_model.base_url,
-            "model_name": self.quick_model.model_name,
-            "max_tokens": self.quick_model.max_tokens,
-            "temperature": self.quick_model.temperature,
-            "timeout": self.quick_model.timeout,
-            "max_retries": self.quick_model.max_retries,
-            "quick_decision_enabled": self.quick_model.quick_decision_enabled,
-            "json_format_enabled": self.quick_model.json_format_enabled,
-            "output_filter_enabled": self.quick_model.output_filter_enabled,
-            "difficulty_judgment_enabled": self.quick_model.difficulty_judgment_enabled,
-            "scoring_system_enabled": self.quick_model.scoring_system_enabled,
-            "thinking_completeness_enabled": self.quick_model.thinking_completeness_enabled,
-        }
+
 
     @property
     def output_filter_config_dict(self) -> Dict[str, Any]:
@@ -644,10 +569,7 @@ TTS_DEFAULT_FORMAT = config.tts.default_format
 TTS_DEFAULT_SPEED = config.tts.default_speed
 TTS_DEFAULT_LANGUAGE = config.tts.default_language
 
-QUICK_MODEL_ENABLED = config.quick_model.enabled
-QUICK_MODEL_API_KEY = config.quick_model.api_key
-QUICK_MODEL_BASE_URL = config.quick_model.base_url
-QUICK_MODEL_NAME = config.quick_model.model_name
+
 
 # MQTT配置兼容性变量
 MQTT_ENABLED = config.mqtt.enabled
@@ -664,7 +586,6 @@ MQTT_QOS = config.mqtt.qos
 WEATHER_API_KEY = config.weather.api_key
 
 # 配置字典，兼容旧版本
-QUICK_MODEL_CONFIG = config.quick_model_config_dict
 OUTPUT_FILTER_CONFIG = config.output_filter_config_dict
 DIFFICULTY_JUDGMENT_CONFIG = config.difficulty_judgment_config_dict
 SCORING_SYSTEM_CONFIG = config.scoring_system_config_dict
@@ -679,11 +600,6 @@ MCP_EXCLUDE_AGENT_TOOLS_FROM_MCP = config.mcp.exclude_agent_tools_from_mcp
 
 # 系统提示词
 NAGA_SYSTEM_PROMPT = config.prompts.naga_system_prompt
-QUICK_DECISION_SYSTEM_PROMPT = config.prompts.quick_decision_prompt
-JSON_FORMAT_SYSTEM_PROMPT = config.prompts.json_format_prompt
-DIFFICULTY_JUDGMENT_SYSTEM_PROMPT = config.prompts.difficulty_judgment_prompt
-RESULT_SCORING_SYSTEM_PROMPT = config.prompts.result_scoring_prompt
-THINKING_COMPLETENESS_SYSTEM_PROMPT = config.prompts.thinking_completeness_prompt
 NEXT_QUESTION_SYSTEM_PROMPT = config.prompts.next_question_prompt
 
 # 工具函数
@@ -721,7 +637,7 @@ if config.system.debug:
     print(f"NagaAgent {config.system.version} 配置已加载")
     print(f"API服务器: {'启用' if config.api_server.enabled else '禁用'} ({config.api_server.host}:{config.api_server.port})")
     print(f"GRAG记忆系统: {'启用' if config.grag.enabled else '禁用'}")
-    print(f"快速模型: {'启用' if config.quick_model.enabled else '禁用'}")
+
 
 # Edge浏览器相关全局变量
 EDGE_LNK_PATH = config.browser.edge_lnk_path

@@ -991,12 +991,32 @@ class ChatWindow(QWidget):
         try:
             # 检查是否存在知识图谱文件
             graph_file = "logs/knowledge_graph/graph.html"
-            if os.path.exists(graph_file):
+            quintuples_file = "logs/knowledge_graph/quintuples.json"
+            
+            # 如果HTML文件不存在，尝试生成
+            if not os.path.exists(graph_file):
+                if os.path.exists(quintuples_file):
+                    # 有五元组数据，生成HTML
+                    s.add_user_message("系统", "🔄 正在生成心智云图...")
+                    try:
+                        from summer_memory.quintuple_visualize_v2 import visualize_quintuples
+                        visualize_quintuples()
+                        if os.path.exists(graph_file):
+                            import webbrowser
+                            webbrowser.open(graph_file)
+                            s.add_user_message("系统", "🧠 心智云图已生成并打开")
+                        else:
+                            s.add_user_message("系统", "❌ 心智云图生成失败")
+                    except Exception as e:
+                        s.add_user_message("系统", f"❌ 生成心智云图失败: {str(e)}")
+                else:
+                    # 没有五元组数据，提示用户
+                    s.add_user_message("系统", "❌ 未找到五元组数据，请先进行对话以生成知识图谱")
+            else:
+                # HTML文件存在，直接打开
                 import webbrowser
                 webbrowser.open(graph_file)
                 s.add_user_message("系统", "🧠 心智云图已打开")
-            else:
-                s.add_user_message("系统", "❌ 未找到心智云图文件，请先生成知识图谱")
         except Exception as e:
             s.add_user_message("系统", f"❌ 打开心智云图失败: {str(e)}")
 

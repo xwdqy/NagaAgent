@@ -5,7 +5,8 @@ from typing import List, Dict, Optional, Tuple
 from .quintuple_extractor import extract_quintuples
 from .quintuple_graph import store_quintuples, query_graph_by_keywords, get_all_quintuples
 from .quintuple_rag_query import query_knowledge, set_context
-import config
+from .task_manager import task_manager, start_auto_cleanup
+from config import config
 
 logger = logging.getLogger(__name__)
 
@@ -13,12 +14,13 @@ class GRAGMemoryManager:
     """GRAG知识图谱记忆管理器"""
     
     def __init__(self):
-        self.enabled = config.GRAG_ENABLED
-        self.auto_extract = config.GRAG_AUTO_EXTRACT
-        self.context_length = config.GRAG_CONTEXT_LENGTH
-        self.similarity_threshold = config.GRAG_SIMILARITY_THRESHOLD
+        self.enabled = config.grag.enabled
+        self.auto_extract = config.grag.auto_extract
+        self.context_length = config.grag.context_length
+        self.similarity_threshold = config.grag.similarity_threshold
         self.recent_context = [] # 最近对话上下文
         self.extraction_cache = set() # 避免重复提取
+        self.active_tasks = set() # 当前活跃的任务ID
         
         if not self.enabled:
             logger.info("GRAG记忆系统已禁用")
@@ -28,12 +30,20 @@ class GRAGMemoryManager:
             # 初始化Neo4j连接
             from .quintuple_graph import graph
             logger.info("GRAG记忆系统初始化成功")
+            
+            # 启动自动清理任务
+            start_auto_cleanup()
+            
+            # 设置任务完成回调
+            task_manager.on_task_completed = self._on_task_completed
+            task_manager.on_task_failed = self._on_task_failed
+            
         except Exception as e:
             logger.error(f"GRAG记忆系统初始化失败: {e}")
             self.enabled = False
 
     async def add_conversation_memory(self, user_input: str, ai_response: str) -> bool:
-        """添加对话记忆到知识图谱（同时更新上下文和五元组）"""
+        """添加对话记忆到知识图谱（使用任务管理器并发处理）"""
         if not self.enabled:
             return False
         try:
@@ -45,23 +55,56 @@ class GRAGMemoryManager:
             if len(self.recent_context) > self.context_length:
                 self.recent_context = self.recent_context[-self.context_length:]
 
-            # 提取和存储五元组
+            # 使用任务管理器异步提取五元组
             if self.auto_extract:
-                # 创建并等待任务完成 - 减少超时时间
-                task = asyncio.create_task(self._extract_and_store_quintuples(conversation_text))
-                # 减少超时时间从20秒到12秒，避免阻塞主流程
                 try:
-                    await asyncio.wait_for(task, timeout=12.0)
-                except asyncio.TimeoutError:
-                    logger.warning("五元组提取任务超时，继续主流程")
-                    # 超时不影响主流程，返回True
-                    return True
+                    task_id = task_manager.add_task(conversation_text)
+                    self.active_tasks.add(task_id)
+                    logger.info(f"已提交五元组提取任务: {task_id}")
+                except Exception as e:
+                    logger.error(f"提交提取任务失败: {e}")
+                    # 如果任务管理器失败，回退到同步提取
+                    await self._extract_and_store_quintuples_fallback(conversation_text)
+            
             return True
         except Exception as e:
             logger.error(f"添加对话记忆失败: {e}")
             return False
 
-    async def _extract_and_store_quintuples(self, text: str) -> bool:
+    async def _on_task_completed(self, task_id: str, quintuples: List) -> None:
+        """任务完成回调"""
+        try:
+            self.active_tasks.discard(task_id)
+            logger.info(f"任务完成回调: {task_id}, 提取到 {len(quintuples)} 个五元组")
+            
+            if not quintuples:
+                logger.warning(f"任务 {task_id} 未提取到五元组")
+                return
+            
+            # 存储到Neo4j
+            store_success = await asyncio.wait_for(
+                asyncio.to_thread(store_quintuples, quintuples),
+                timeout=15.0  # 15秒超时
+            )
+            
+            if store_success:
+                logger.info(f"任务 {task_id} 的五元组存储成功")
+            else:
+                logger.error(f"任务 {task_id} 的五元组存储失败")
+                
+        except Exception as e:
+            logger.error(f"任务完成回调处理失败: {e}")
+
+    async def _on_task_failed(self, task_id: str, error: str) -> None:
+        """任务失败回调"""
+        try:
+            self.active_tasks.discard(task_id)
+            logger.error(f"任务失败回调: {task_id}, 错误: {error}")
+        except Exception as e:
+            logger.error(f"任务失败回调处理失败: {e}")
+
+    async def _extract_and_store_quintuples_fallback(self, text: str) -> bool:
+        """回退到同步提取方法"""
         try:
             import hashlib
             text_hash = hashlib.sha256(text.encode()).hexdigest()
@@ -70,8 +113,17 @@ class GRAGMemoryManager:
                 logger.debug(f"跳过已处理的文本: {text[:50]}...")
                 return True
 
-            logger.info(f"开始提取五元组: {text[:100]}...")
-            quintuples = await asyncio.to_thread(extract_quintuples, text)
+            logger.info(f"使用回退方法提取五元组: {text[:100]}...")
+            
+            # 添加超时保护，避免长时间阻塞
+            try:
+                quintuples = await asyncio.wait_for(
+                    asyncio.to_thread(extract_quintuples, text), 
+                    timeout=30.0  # 30秒超时
+                )
+            except asyncio.TimeoutError:
+                logger.warning("五元组提取超时，跳过本次提取")
+                return False
 
             if not quintuples:
                 logger.warning("未提取到五元组")
@@ -79,8 +131,15 @@ class GRAGMemoryManager:
 
             logger.info(f"提取到 {len(quintuples)} 个五元组，准备存储")
 
-            # 存储到Neo4j
-            store_success = await asyncio.to_thread(store_quintuples, quintuples)
+            # 存储到Neo4j - 也添加超时保护
+            try:
+                store_success = await asyncio.wait_for(
+                    asyncio.to_thread(store_quintuples, quintuples),
+                    timeout=15.0  # 15秒超时
+                )
+            except asyncio.TimeoutError:
+                logger.warning("五元组存储超时，跳过本次存储")
+                return False
 
             if store_success:
                 self.extraction_cache.add(text_hash)
@@ -137,15 +196,33 @@ class GRAGMemoryManager:
             
         try:
             all_quintuples = get_all_quintuples()
+            task_stats = task_manager.get_stats()
+            
             return {
                 "enabled": True,
                 "total_quintuples": len(all_quintuples),
                 "context_length": len(self.recent_context),
-                "cache_size": len(self.extraction_cache)
+                "cache_size": len(self.extraction_cache),
+                "active_tasks": len(self.active_tasks),
+                "task_manager": task_stats
             }
         except Exception as e:
             logger.error(f"获取记忆统计失败: {e}")
             return {"enabled": False, "error": str(e)}
+    
+    def get_task_status(self, task_id: str) -> Optional[Dict]:
+        """获取任务状态"""
+        return task_manager.get_task_status(task_id)
+    
+    def get_all_task_status(self) -> List[Dict]:
+        """获取所有任务状态"""
+        return task_manager.get_all_tasks()
+    
+    def cancel_task(self, task_id: str) -> bool:
+        """取消任务"""
+        if task_id in self.active_tasks:
+            self.active_tasks.discard(task_id)
+        return task_manager.cancel_task(task_id)
     
     async def clear_memory(self) -> bool:
         """清空记忆"""
@@ -155,6 +232,12 @@ class GRAGMemoryManager:
         try:
             self.recent_context.clear()
             self.extraction_cache.clear()
+            
+            # 取消所有活跃任务
+            for task_id in list(self.active_tasks):
+                task_manager.cancel_task(task_id)
+            self.active_tasks.clear()
+            
             logger.info("记忆已清空")
             return True
         except Exception as e:

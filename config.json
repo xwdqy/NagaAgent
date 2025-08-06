@@ -1,7 +1,7 @@
 {
   "system": {
     "version": "3.0",
-    "voice_enabled": true,
+    "voice_enabled": false,
     "stream_mode": false,
     "debug": true,
     "log_level": "DEBUG",
@@ -60,16 +60,6 @@
     "minimax_emotion": "neutral",
     "keep_audio_files": false
   },
-  "quick_model": {
-    "enabled": true,
-    "api_key": " ",
-    "base_url": "https://ark.cn-beijing.volces.com/api/v3",
-    "model_name": "doubao-seed-1-6-flash-250615",
-    "max_tokens": 512,
-    "temperature": 0.05,
-    "timeout": 5,
-    "max_retries": 2
-  },
   "weather": {
     "api_key": "06e5619c6e787a67ae4b9f177ab48fe2"
   },
@@ -78,9 +68,9 @@
     "broker": " ",
     "port": 1878,
     "topic": " ",
-    "client_id": " ",
+    "client_id": "k28x9wMnNss.E6UtPoMxRw7iDKzQuBVE|securemode=2,signmethod=hmacsha256,timestamp=1753506912322|",
     "username": " ",
-    "password": "6d43c5dd91a0f19517bd72161de90ba09f568db8b2655fa9a2bf714f046adb1d",
+    "password": " ",
     "keepalive": 60,
     "qos": 1
   },

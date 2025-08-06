@@ -291,6 +291,30 @@ class ElegantSettingsWidget(QWidget):
             version_label.setStyleSheet("color: #fff; font: 10pt 'Lucida Console';")  # 和历史轮数一样的字体大小
             version_card = SettingCard("系统版本", "当前系统版本号", version_label, None)
             group.add_card(version_card)
+        
+        # 访问娜迦API
+        naga_api_btn = QPushButton("访问娜迦API")
+        naga_api_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(100, 200, 255, 150);
+                color: #fff;
+                border: 1px solid rgba(255, 255, 255, 50);
+                border-radius: 6px;
+                padding: 8px 16px;
+                font: 10pt 'Lucida Console';
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                border: 1px solid rgba(255, 255, 255, 80);
+                background: rgba(120, 220, 255, 180);
+            }
+            QPushButton:pressed {
+                background: rgba(80, 180, 255, 200);
+            }
+        """)
+        naga_api_btn.clicked.connect(self.open_naga_api)
+        naga_api_card = SettingCard("娜迦API", "访问娜迦API官方网站", naga_api_btn, None)
+        group.add_card(naga_api_card)
         # voice_enabled
         if hasattr(config.system, "voice_enabled"):
             voice_checkbox = QCheckBox()
@@ -300,15 +324,7 @@ class ElegantSettingsWidget(QWidget):
             voice_card.value_changed.connect(self.on_setting_changed)
             group.add_card(voice_card)
             self.voice_checkbox = voice_checkbox
-        # stream_mode
-        if hasattr(config.system, "stream_mode"):
-            stream_checkbox = QCheckBox()
-            stream_checkbox.setChecked(config.system.stream_mode)
-            stream_checkbox.setStyleSheet(self.get_checkbox_style() + "color: #fff;")
-            stream_card = SettingCard("流式响应", "启用实时流式响应显示", stream_checkbox, "system.stream_mode")
-            stream_card.value_changed.connect(self.on_setting_changed)
-            group.add_card(stream_card)
-            self.stream_checkbox = stream_checkbox
+
         # debug
         if hasattr(config.system, "debug"):
             debug_checkbox = QCheckBox()
@@ -388,21 +404,7 @@ class ElegantSettingsWidget(QWidget):
             neo4j_pwd_card = SettingCard("Neo4j 密码", "知识图谱数据库密码", neo4j_pwd_input, "grag.neo4j_password")
             neo4j_pwd_card.value_changed.connect(self.on_setting_changed)
             group.add_card(neo4j_pwd_card)
-        # quick_model部分
-        if hasattr(config.quick_model, "base_url"):
-            qm_url_input = QLineEdit()
-            qm_url_input.setText(config.quick_model.base_url)
-            qm_url_input.setStyleSheet(self.get_input_style() + "color: #fff;")
-            qm_url_card = SettingCard("快速模型URL", "快速模型API地址", qm_url_input, "quick_model.base_url")
-            qm_url_card.value_changed.connect(self.on_setting_changed)
-            group.add_card(qm_url_card)
-        if hasattr(config.quick_model, "api_key"):
-            qm_api_input = QLineEdit()
-            qm_api_input.setText(config.quick_model.api_key)
-            qm_api_input.setStyleSheet(self.get_input_style() + "color: #fff;")
-            qm_api_card = SettingCard("快速模型API Key", "快速模型API密钥", qm_api_input, "quick_model.api_key")
-            qm_api_card.value_changed.connect(self.on_setting_changed)
-            group.add_card(qm_api_card)
+
             
         # Similarity Threshold
         if hasattr(config.grag, "similarity_threshold"):
@@ -683,7 +685,6 @@ class ElegantSettingsWidget(QWidget):
             self.history_spin.setValue(config.api.max_history_rounds)
             
             # 界面设置
-            self.stream_checkbox.setChecked(config.system.stream_mode)
             self.voice_checkbox.setChecked(config.system.voice_enabled)
             
             # 高级设置
@@ -758,6 +759,14 @@ class ElegantSettingsWidget(QWidget):
             self.update_status_label(f"✗ 保存失败: {str(e)}")
             
             
+    def open_naga_api(self):
+        """打开娜迦API网站"""
+        import webbrowser
+        try:
+            webbrowser.open("https://naga.furina.chat/")
+        except Exception as e:
+            print(f"打开娜迦API网站失败: {e}")
+    
     def reset_settings(self):
         """重置所有设置"""
         self.pending_changes.clear()
