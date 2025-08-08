@@ -25,6 +25,9 @@ from config import config
 from summer_memory.memory_manager import memory_manager
 from ui.pyqt_chat_window import ChatWindow
 
+# 导入控制台托盘功能
+from ui.tray.console_tray import integrate_console_tray
+
 n=NagaConversation()
 def show_help():print('系统命令: 清屏, 查看索引, 帮助, 退出')
 def show_index():print('主题分片索引已集成，无需单独索引查看')
@@ -154,7 +157,12 @@ if __name__=="__main__":
  app=QApplication(sys.argv)
  icon_path = os.path.join(os.path.dirname(__file__), "ui", "window_icon.png")
  app.setWindowIcon(QIcon(icon_path))
+ 
+ # 集成控制台托盘功能
+ console_tray = integrate_console_tray()
+ 
  win=ChatWindow()
  win.setWindowTitle("NagaAgent")
  win.show()
+
  sys.exit(app.exec_())

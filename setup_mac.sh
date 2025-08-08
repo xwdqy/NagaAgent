@@ -73,24 +73,135 @@ if ! command -v portaudio &> /dev/null; then
     print_info "如需语音功能，请运行: brew install portaudio"
 fi
 
-# 安装 Python 依赖
-print_info "安装 Python 依赖..."
-if [ -f "pyproject.toml" ]; then
-    echo "使用 uv 安装依赖..."
-    uv sync || pip install -e .
-elif [ -f "requirements.txt" ]; then
-    echo "使用 requirements.txt 安装依赖..."
-    pip install -r requirements.txt
+# 安装核心依赖 (需要编译的包)
+print_info "安装核心依赖 (numpy, pandas, scipy)..."
+if pip install --only-binary=all numpy pandas scipy; then
+    print_success "核心依赖安装成功"
 else
-    echo "未找到依赖文件，请检查项目配置"
-    exit 1
+    print_warning "使用 --only-binary 安装失败，尝试普通安装..."
+    if pip install numpy pandas scipy; then
+        print_success "核心依赖安装成功"
+    else
+        print_error "核心依赖安装失败，请检查编译环境"
+        exit 1
+    fi
 fi
 
-# 兼容旧的 requirements 文件扫描（如果存在）
-for req_file in requirements*.txt 2>/dev/null; do
-    if [[ -f "$req_file" ]]; then
-        print_info "安装 $req_file..."
-        pip install -r "$req_file" -i https://pypi.tuna.tsinghua.edu.cn/simple
+# 安装基础依赖
+print_info "安装基础依赖..."
+basic_deps=("mcp" "openai" "openai-agents" "python-dotenv" "requests" "aiohttp" "pytz" "colorama" "python-dateutil")
+for dep in "${basic_deps[@]}"; do
+    if pip install "$dep"; then
+        print_success "已安装 $dep"
+    else
+        print_warning "安装 $dep 失败"
+    fi
+done
+
+# 安装 GRAG 知识图谱依赖
+print_info "安装 GRAG 知识图谱依赖..."
+grag_deps=("py2neo" "pyvis" "matplotlib")
+for dep in "${grag_deps[@]}"; do
+    if pip install "$dep"; then
+        print_success "已安装 $dep"
+    else
+        print_warning "安装 $dep 失败"
+    fi
+done
+
+# 安装 API 服务器依赖
+print_info "安装 API 服务器依赖..."
+api_deps=("flask-cors" "flask" "gevent" "edge-tts" "emoji" "fastapi")
+for dep in "${api_deps[@]}"; do
+    if pip install "$dep"; then
+        print_success "已安装 $dep"
+    else
+        print_warning "安装 $dep 失败"
+    fi
+done
+
+# 安装网络通信依赖
+print_info "安装网络通信依赖..."
+network_deps=("uvicorn" "librosa" "websockets")
+for dep in "${network_deps[@]}"; do
+    if pip install "$dep"; then
+        print_success "已安装 $dep"
+    else
+        print_warning "安装 $dep 失败"
+    fi
+done
+
+# 安装 AI/ML 依赖
+print_info "安装 AI/ML 依赖..."
+ai_deps=("tqdm" "scikit-learn" "transformers")
+for dep in "${ai_deps[@]}"; do
+    if pip install "$dep"; then
+        print_success "已安装 $dep"
+    else
+        print_warning "安装 $dep 失败"
+    fi
+done
+
+# 安装数据处理依赖
+print_info "安装数据处理依赖..."
+data_deps=("pydantic" "pydantic-settings" "griffe" "anyio" "httpx" "httpx-sse" "sse-starlette" "starlette" "certifi" "charset-normalizer" "idna" "urllib3" "typing-extensions" "markdown")
+for dep in "${data_deps[@]}"; do
+    if pip install "$dep"; then
+        print_success "已安装 $dep"
+    else
+        print_warning "安装 $dep 失败"
+    fi
+done
+
+# 安装 GUI 依赖
+print_info "安装 GUI 依赖..."
+gui_deps=("playwright" "greenlet" "pyee" "pygame" "html2text")
+for dep in "${gui_deps[@]}"; do
+    if pip install "$dep"; then
+        print_success "已安装 $dep"
+    else
+        print_warning "安装 $dep 失败"
+    fi
+done
+
+# 安装音频处理依赖
+print_info "安装音频处理依赖..."
+audio_deps=("sounddevice" "soundfile" "pyaudio" "edge-tts" "emoji")
+for dep in "${audio_deps[@]}"; do
+    if pip install "$dep"; then
+        print_success "已安装 $dep"
+    else
+        print_warning "安装 $dep 失败"
+    fi
+done
+
+# 安装 PyQt5
+print_info "安装 PyQt5..."
+if pip install pyqt5; then
+    print_success "PyQt5 安装成功"
+else
+    print_warning "PyQt5 安装失败"
+fi
+
+# 安装系统托盘依赖
+print_info "安装系统托盘依赖..."
+tray_deps=("pystray" "pillow")
+for dep in "${tray_deps[@]}"; do
+    if pip install "$dep"; then
+        print_success "已安装 $dep"
+    else
+        print_warning "安装 $dep 失败"
+    fi
+done
+
+# 安装其他工具依赖
+print_info "安装其他工具依赖..."
+tool_deps=("tiktoken" "bottleneck")
+for dep in "${tool_deps[@]}"; do
+    if pip install "$dep"; then
+        print_success "已安装 $dep"
+    else
+        print_warning "安装 $dep 失败"
     fi
 done
 
@@ -110,16 +221,38 @@ fi
 
 # 安装 playwright 浏览器驱动
 print_info "安装 playwright 浏览器驱动..."
-python -m playwright install chromium
+if python -m playwright install chromium; then
+    print_success "Playwright Chromium 安装成功"
+else
+    print_warning "Playwright 浏览器驱动安装失败"
+fi
+
+# 验证关键依赖
+print_info "验证关键依赖..."
+critical_deps=("numpy" "pandas" "pyqt5" "pystray" "pillow")
+for dep in "${critical_deps[@]}"; do
+    if python -c "import $dep; print('$dep - OK')" 2>/dev/null; then
+        print_success "$dep 验证通过"
+    else
+        print_warning "$dep 验证失败"
+    fi
+done
 
 # 验证 playwright 安装
 print_info "验证 playwright 安装..."
-PLAYWRIGHT_VERSION=$(python -m playwright --version)
-if [[ $? -ne 0 ]]; then
-    print_error "Playwright 安装验证失败"
-    exit 1
+if PLAYWRIGHT_VERSION=$(python -m playwright --version 2>/dev/null); then
+    print_success "Playwright 版本: $PLAYWRIGHT_VERSION"
+else
+    print_warning "Playwright 安装验证失败"
 fi
-print_success "Playwright 版本: $PLAYWRIGHT_VERSION"
+
+# 测试托盘功能
+print_info "测试托盘功能..."
+if python -c "import pystray, PIL; print('Tray dependencies - OK')" 2>/dev/null; then
+    print_success "托盘功能测试通过"
+else
+    print_warning "托盘功能测试失败"
+fi
 
 # 创建启动脚本
 print_info "创建启动脚本..."
@@ -136,6 +269,9 @@ chmod +x start_mac.sh
 print_success "环境设置完成！"
 print_info "启动方式:"
 print_info "  ./start_mac.sh"
+print_info ""
+print_info "托盘模式启动:"
+print_info "  pythonw main.py"
 print_info ""
 print_info "如需安装其他浏览器驱动，请运行:"
 print_info "  python -m playwright install firefox   # 安装 Firefox"

@@ -1,12 +1,12 @@
 [project]
 name = "nagaagent"
-version = "2.1.0"
-description = "NagaAgent 2.1 - 一个强大的AI助手"
+version = "3.0.5"
+description = "NagaAgent 3.0 - 智能对话助手，支持多MCP服务、流式语音交互、GRAG知识图谱记忆系统、RESTful API接口、控制台托盘功能"
 authors = [
     {name = "柏斯阔落", email = "1781393885@qq.com"},
 ]
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.8"
 dependencies = [
     # 核心依赖
     "mcp>=1.6.0",
@@ -19,22 +19,25 @@ dependencies = [
     "colorama>=0.4.6",
     "python-dateutil>=2.9.0.post0",
     
-    # GRAG知识图谱记忆系统依赖
+    # GRAG知识图谱相关依赖
     "py2neo>=2021.2.3",
     "pyvis>=0.3.2",
+    "matplotlib>=3.10.0",
     
-    # 流式语音交互相关依赖
+    # API服务器相关依赖
     "flask-cors>=6.0.1",
-    "flask>=3.1.1",
+    "flask>=3.1.0",
     "gevent>=25.5.1",
     "edge-tts>=7.0.2",
     "emoji>=2.14.1",
     "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.34.0",
-    "librosa>=0.11.0",
-    "websockets>=14.0",  # 使用最新版本避免弃用警告
     
-    # AI和数据处理相关
+    # 网络通信相关依赖
+    "uvicorn[standard]>=0.34.0",
+    "librosa",
+    "websockets>=14.0",  # WebSocket通信支持
+    
+    # AI机器学习相关依赖
     "numpy>=1.24.0,<2.0.0",
     "pandas>=2.0.0,<3.0.0",
     "tqdm>=4.67.1",
@@ -42,7 +45,7 @@ dependencies = [
     "scipy>=1.15.2",
     "transformers>=4.51.3",
     
-    # 数据处理
+    # 数据处理相关依赖
     "pydantic>=2.11.3",
     "pydantic-settings>=2.9.1",
     "griffe>=1.7.3",
@@ -58,21 +61,40 @@ dependencies = [
     "typing-extensions>=4.13.2",
     "markdown>=3.8",
     
-    # GUI相关依赖
-    # 注意：PyQt5现在使用系统版本，通过软链接解决版本兼容性问题
-    # 如果系统没有PyQt5，需要先安装：sudo pacman -S python-pyqt5
+    # GUI界面相关依赖
     "pyqt5>=5.15.11",
-    "pyqt5-qt5==5.15.2",
     "playwright>=1.52.0",
     "greenlet>=3.2.1",
     "pyee>=13.0.0",
     "pygame>=2.6.0",
     "html2text>=2020.1.16",
     
-    # 其他工具
+    # 音频处理相关依赖
+    "sounddevice>=0.4.6",
+    "soundfile>=0.12.1",
+    "pyaudio>=0.2.14",
+    "edge-tts>=6.1.9",
+    "emoji>=2.8.0",
+    
+    # 系统托盘相关依赖
+    "pystray>=0.19.4",
+    "pillow>=10.0.0",
+    
+    # 其他工具依赖
     "tiktoken",
     "bottleneck>=1.3.6",
-    "matplotlib>=3.5.0",  # 图表绘制和可视化
+    
+    # 系统控制相关依赖
+    "screen-brightness-control",  # 屏幕亮度控制
+    "pycaw",  # 音频控制
+    "comtypes",  # pycaw的依赖
+    
+    # MCP工具相关依赖
+    "jmcomic>=2.6.5",  # 漫画下载工具
+    "fastmcp>=2.11.2",  # MCP工具框架
+    
+    # MQTT通信相关依赖
+    "paho-mqtt>=2.0.0",  # MQTT客户端库
 ]
 
 # 可选依赖组
