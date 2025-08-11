@@ -1,0 +1,105 @@
+{
+  "name": "NagaPortalAgent",
+  "displayName": "娜迦官网API Agent",
+  "version": "0.1.0",
+  "description": "与娜迦官网API进行交互的MCP服务（需登录），提供登录/GET/POST/登出/获取用户信息的基础骨架。",
+  "author": "NagaAgent",
+  "agentType": "mcp",
+  "entryPoint": {
+    "module": "mcpserver.agent_naga_portal.naga_portal_agent",
+    "class": "NagaPortalAgent"
+  },
+  "factory": {
+    "create_instance": "create_naga_portal_agent",
+    "validate_config": "validate_agent_config",
+    "get_dependencies": "get_agent_dependencies"
+  },
+  "communication": {
+    "protocol": "stdio",
+    "timeout": 15000
+  },
+  "capabilities": {
+    "invocationCommands": [
+      {
+        "command": "set_bearer_token",
+        "description": "设置Bearer Token到默认请求头；参数：token（必填）",
+        "example": "{\"tool_name\":\"set_bearer_token\",\"token\":\"xxx\"}"
+      },
+      {
+        "command": "set_headers",
+        "description": "批量更新默认请求头；参数：headers对象",
+        "example": "{\"tool_name\":\"set_headers\",\"headers\":{\"x-api-key\":\"xxx\"}}"
+      },
+      {
+        "command": "set_cookies",
+        "description": "批量更新默认cookies；参数：cookies对象",
+        "example": "{\"tool_name\":\"set_cookies\",\"cookies\":{\"sid\":\"abc\"}}"
+      },
+      {
+        "command": "naga_request",
+        "description": "通用请求；参数：method(默认GET)、path(必填)、params/json/headers(可选)",
+        "example": "{\"tool_name\":\"naga_request\",\"method\":\"POST\",\"path\":\"/api/echo\",\"json\":{\"a\":1}}"
+      },
+      {
+        "command": "naga_login",
+        "description": "使用config.naga_portal的用户名/密码登录官网；可选参数：username、password、login_path（默认/api/user/login）",
+        "example": "{\"tool_name\":\"naga_login\"}"
+      },
+      {
+        "command": "naga_get",
+        "description": "向官网发起GET请求测试；参数：path（以/开头，必填）、params（可选对象）",
+        "example": "{\"tool_name\":\"naga_get\",\"path\":\"/api/profile\"}"
+      },
+      {
+        "command": "naga_post",
+        "description": "向官网发起POST请求测试；参数：path（以/开头，必填）、json（可选对象）",
+        "example": "{\"tool_name\":\"naga_post\",\"path\":\"/api/echo\",\"json\":{\"ping\":\"pong\"}}"
+      },
+      {
+        "command": "get_user_info",
+        "description": "获取当前登录用户信息（占位实现，默认请求/api/profile）",
+        "example": "{\"tool_name\":\"get_user_info\"}"
+      },
+      {
+        "command": "naga_logout",
+        "description": "登出并清理本地会话",
+        "example": "{\"tool_name\":\"naga_logout\"}"
+      }
+    ]
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "tool_name": {"type": "string"},
+      "method": {"type": "string"},
+      "username": {"type": "string"},
+      "password": {"type": "string"},
+      "login_path": {"type": "string"},
+      "path": {"type": "string"},
+      "params": {"type": "object"},
+      "json": {"type": "object"},
+      "headers": {"type": "object"},
+      "cookies": {"type": "object"},
+      "token": {"type": "string"}
+    },
+    "required": ["tool_name"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "success": {"type": "boolean"},
+      "status": {"type": "string"},
+      "message": {"type": "string"},
+      "data": {"type": "object"},
+      "error": {"type": "string"}
+    }
+  },
+  "runtime": {
+    "instance": null,
+    "is_initialized": false,
+    "last_used": null,
+    "usage_count": 0
+  }
+}
+
+

@@ -29,8 +29,8 @@ def query_knowledge(user_question):
     """使用 DeepSeek API 提取关键词并查询知识图谱"""
     context_str = "\n".join(recent_context) if recent_context else "无上下文"
     prompt = (
-        f"基于以下上下文和用户问题，提取与知识图谱相关的关键词（如实体、关系、实体类型），"
-        f"仅返回核心关键词，避免无关词。返回 JSON 格式的关键词列表：\n"
+        f"基于以下上下文和用户问题，提取与知识图谱相关的关键词（如人物、物体、关系、实体类型），"
+        f"仅以列表的形式返回核心关键词，避免无关词。返回 JSON 格式的关键词列表：\n"
         f"上下文：\n{context_str}\n"
         f"问题：{user_question}\n"
         f"输出格式：```json\n[]\n```"
@@ -58,7 +58,7 @@ def query_knowledge(user_question):
         body["format"] = "json"
         # 简化提示词，ollama会自动处理JSON格式
         simplified_prompt = (
-            f"基于以下上下文和用户问题，提取与知识图谱相关的关键词（如实体、关系、实体类型），"
+            f"基于以下上下文和用户问题，提取与知识图谱相关的关键词（如人物、物体、关系、实体类型），"
             f"仅返回核心关键词，避免无关词。直接返回关键词数组：\n"
             f"上下文：\n{context_str}\n"
             f"问题：{user_question}"
@@ -80,6 +80,7 @@ def query_knowledge(user_question):
             if raw_content.startswith("```json") and raw_content.endswith("```"):
                 raw_content = raw_content[7:-3].strip()
             keywords = json.loads(raw_content)
+            print(keywords)
             if not isinstance(keywords, list):
                 raise ValueError("关键词应为列表")
         except (json.JSONDecodeError, ValueError) as e:

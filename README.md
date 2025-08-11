@@ -1,100 +1,243 @@
-# NagaAgent 3.0
+# NagaAgent 3.1
 
-> 智能对话助手，支持多MCP服务、流式语音交互、GRAG知识图谱记忆系统、RESTful API接口、控制台托盘功能。
+![NagaAgent Logo](https://img.shields.io/badge/NagaAgent-3.0-blue?style=for-the-badge&logo=python&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-green?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python)
+![Version](https://img.shields.io/badge/Version-3.0.5-orange?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge)
+
+
+![Star History](https://img.shields.io/github/stars/Xxiii8322766509/NagaAgent?style=social)![Forks](https://img.shields.io/github/forks/Xxiii8322766509/NagaAgent?style=social)![Issues](https://img.shields.io/github/issues/Xxiii8322766509/NagaAgent)![Pull Requests](https://img.shields.io/github/issues-pr/Xxiii8322766509/NagaAgent)
+
+---
+
+**🐍 智能对话助手 | 多平台支持 | 丰富生态 | 易于扩展**
+
+[功能特性](#-核心功能) • [快速开始](#-快速开始) • [安装指南](#-详细安装指南) • [API文档](#-restful-api服务) • [配置说明](#-配置说明)
+
+---
+
+### 🎯 项目亮点
+
+✅ **🧠 智能记忆**: 基于 Neo4j 的知识图谱记忆系统  
+✅ **🔧 丰富生态**: 支持多种 MCP 服务和 Agent  
+✅ **🎤 语音交互**: 流式语音合成和识别  
+✅ **🖥️ 现代界面**: 美观的 PyQt5 图形界面  
+✅ **🌐 完整 API**: RESTful API 和流式输出  
+✅ **📱 系统托盘**: 后台运行和自启动支持  
+✅ **🔍 智能代理**: 动态服务发现和管理  
+✅ **🛡️ 安全可靠**: 会话隔离和权限管理  
 
 ---
 
 ## 🚀 快速开始
 
-### 1. 克隆项目
-```bash
-git clone [项目地址]
-cd NagaAgent3.0
-```
+### 📋 系统要求
 
-### 2. 一键配置
+- **操作系统**: Windows 10/11, macOS 10.15+, Linux
+- **Python**: 3.10+ (推荐 3.11)
+- **内存**: 建议 4GB 以上
+- **存储**: 建议 2GB 以上可用空间
 
-**Windows:**
+### 🔧 一键安装
+
+<details>
+<summary><strong>Windows 用户</strong></summary>
+
 ```powershell
+# 克隆项目
+git clone https://github.com/Xxiii8322766509/NagaAgent.git
+cd NagaAgent
+
+# 一键配置
 .\setup.ps1
 ```
+</details>
 
-**Mac:**
+<details>
+<summary><strong>macOS 用户</strong></summary>
+
 ```bash
+# 克隆项目
+git clone https://github.com/Xxiii8322766509/NagaAgent.git
+cd NagaAgent
+
+# 一键配置
 chmod +x setup_mac.sh
 ./setup_mac.sh
 ```
+</details>
 
-### 3. 启动应用
+<details>
+<summary><strong>Linux 用户</strong></summary>
 
-**Windows (普通模式):**
-```powershell
-.\start.bat
-```
-
-**Windows (托盘模式):**
-```powershell
-.\start_with_tray.bat
-```
-
-**Mac:**
 ```bash
-./start_mac.sh
-```
+# 克隆项目
+git clone https://github.com/Xxiii8322766509/NagaAgent.git
+cd NagaAgent
 
-启动后将自动开启PyQt5界面和RESTful API服务器，可同时使用界面对话和API接口。
-
----
-
-## 🖥️ 系统要求
-- **Windows:** Windows 10/11 + PowerShell 5.1+
-- **Mac:** macOS 10.15 (Catalina) 或更高版本 + Homebrew
-- **通用:** Python 3.8+ (推荐 3.11)
-
----
-
-## 🛠️ 依赖安装与环境配置
-
-### Windows 环境
-- 所有依赖见`requirements.txt`
-- 推荐使用虚拟环境：`python -m venv .venv`
-- 如遇`greenlet`、`pyaudio`等安装失败，需先装[Microsoft Visual C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-- 浏览器自动化需`playwright`，首次用需`python -m playwright install chromium`
-- MCP工具依赖：`jmcomic`、`fastmcp`
-
-**依赖安装命令：**
-```powershell
-# 激活虚拟环境
-.venv\Scripts\Activate.ps1
+# 创建虚拟环境
+python3 -m venv .venv
+source .venv/bin/activate
 
 # 安装依赖
 pip install -r requirements.txt
+```
+</details>
 
-# 安装浏览器驱动
-python -m playwright install chromium
+### 🗄️ 启动 Neo4j 服务
 
-# 安装MCP工具依赖
-pip install jmcomic fastmcp
+```bash
+# 启动 Neo4j 容器
+docker run -d \
+  --restart always \
+  --publish=7474:7474 \
+  --publish=7687:7687 \
+  --env NEO4J_AUTH=neo4j/your_password \
+  --volume=neo4j_data:/data \
+  neo4j:latest
 ```
 
-### Mac 环境
-- 系统依赖通过Homebrew安装：
-  ```bash
-  brew install python@3.11 portaudio
-  brew install --cask google-chrome
-  ```
-- Python依赖安装：
-  ```bash
-  python3 -m venv .venv
-  source .venv/bin/activate
-  pip install -r requirements.txt
-  python -m playwright install chromium
-  ```
+> **端口冲突解决**: 如果端口被占用，可以使用其他端口：
+> ```bash
+> --publish=8474:7474 --publish=8687:7687
+> ```
 
-### 环境检查
+### ⚙️ 配置文件
+
+1. 复制配置模板：
+   ```bash
+   cp config.json.example config.json
+   ```
+
+2. 编辑配置文件，设置API密钥和其他参数
+
+### 🚀 启动应用
+
+<details>
+<summary><strong>Windows 启动方式</strong></summary>
+
+```powershell
+# 普通模式
+.\start.bat
+
+# 托盘模式 (推荐)
+.\start_with_tray.bat
+```
+</details>
+
+<details>
+<summary><strong>macOS 启动方式</strong></summary>
+
+```bash
+./start_mac.sh
+```
+</details>
+
+<details>
+<summary><strong>Linux 启动方式</strong></summary>
+
+```bash
+./start.sh
+```
+</details>
+
+启动后将自动开启：
+- 🖥️ PyQt5 图形界面
+- 🌐 RESTful API 服务器
+- 🎤 语音交互服务
+- 🧠 GRAG 知识图谱记忆系统
+
+---
+
+## 🛠️ 详细安装指南
+
+### 🔍 环境检查
+
+安装完成后，运行环境检查：
 ```bash
 python check_env.py
 ```
+
+### 📦 依赖说明
+
+项目依赖主要包括：
+
+| 类别 | 依赖包 | 用途 |
+|------|--------|------|
+| **核心框架** | `openai`, `mcp`, `fastapi` | AI对话和API服务 |
+| **GUI界面** | `PyQt5`, `pygame` | 图形用户界面 |
+| **语音处理** | `edge-tts`, `pyaudio` | 语音合成和识别 |
+| **知识图谱** | `py2neo`, `pyvis` | Neo4j图数据库操作 |
+| **浏览器自动化** | `playwright` | 网页操作自动化 |
+| **MCP工具** | `jmcomic`, `fastmcp` | 多种扩展工具 |
+
+### ⚠️ 常见问题解决
+
+<details>
+<summary><strong>Windows 安装问题</strong></summary>
+
+**C++ 编译工具缺失：**
+```powershell
+# 下载并安装 Microsoft Visual C++ Build Tools
+# https://visualstudio.microsoft.com/visual-cpp-build-tools/
+```
+
+**Numpy 警告并且程序崩溃：**
+```powershell
+# 安装 Visual Studio 后，在 Developer Command Prompt 中执行
+uv pip uninstall numpy
+uv sync --no-cache --reinstall
+```
+
+**权限问题：**
+```powershell
+# 以管理员身份运行 PowerShell
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+</details>
+
+<details>
+<summary><strong>macOS 安装问题</strong></summary>
+
+**Python 版本过低：**
+```bash
+brew install python@3.11
+echo 'export PATH="/usr/local/opt/python@3.11/bin:$PATH"' >> ~/.zshrc
+```
+
+**PyAudio 安装失败：**
+```bash
+brew install portaudio
+pip install pyaudio
+```
+
+**权限问题：**
+```bash
+chmod +x *.sh
+```
+</details>
+
+<details>
+<summary><strong>Linux 安装问题</strong></summary>
+
+**系统依赖：**
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install python3-dev portaudio19-dev
+
+# CentOS/RHEL
+sudo yum install python3-devel portaudio-devel
+```
+
+**Docker 权限：**
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
+</details>
 
 ---
 
@@ -151,38 +294,102 @@ python check_env.py
 
 ---
 
-## 🌟 主要特性
+## 🌟 核心功能
 
-### 核心功能
-- **全局配置管理**: 所有变量统一在`config.py`管理，支持.env和环境变量
-- **RESTful API接口**: 自动启动HTTP服务器，支持完整对话功能和流式输出
-- **GRAG知识图谱记忆系统**: 基于Neo4j的五元组知识图谱，自动提取对话中的实体关系
-- **HANDOFF工具调用循环**: 自动解析和执行LLM返回的工具调用，支持多轮递归调用
-- **多Agent能力扩展**: 浏览器、文件、代码等多种Agent即插即用
-- **跨平台兼容**: Windows/Mac自动适配，浏览器路径自动检测
+### 🧠 智能对话系统
+- **多模型支持**: 兼容 OpenAI、DeepSeek、Anthropic 等主流 LLM 提供商
+- **上下文记忆**: 智能维护对话历史，支持多轮对话上下文
+- **流式输出**: 实时显示 AI 回复，提升交互体验
+- **工具调用**: 自动解析和执行 LLM 返回的工具调用指令
 
-### 语音交互
-- **流式语音交互**: 基于Edge-TTS的OpenAI兼容语音合成
-- **智能分句**: 支持pygame后台直接播放和智能分句
+### 🔧 MCP 服务生态
+- **动态服务发现**: 自动扫描和注册所有 MCP 服务
+- **即插即用**: 新增服务无需重启系统
+- **服务管理**: 统一的服务池查询和管理接口
+- **多服务协作**: 支持多个 Agent 协同工作
+
+### 🗺️ GRAG 知识图谱
+- **五元组提取**: 自动从对话中提取实体-关系-属性
+- **智能检索**: 基于相似度的上下文召回机制
+- **可视化展示**: 支持知识图谱的可视化展示
+- **历史导入**: 兼容旧版对话记录的批量导入
+
+### 🎤 语音交互系统
+- **流式合成**: 基于 Edge-TTS 的实时语音合成
+- **智能分句**: 自动识别句子边界，优化播放体验
 - **异步处理**: 文本显示和音频播放完全分离
+- **多引擎支持**: 兼容多种 TTS 引擎
 
-### UI界面
-- **PyQt5动画与UI**: 支持PNG序列帧，loading动画极快
-- **Markdown支持**: 聊天窗口支持Markdown语法，包括标题、粗体、斜体、代码块、表格等
-- **主题自定义**: 聊天窗口背景透明度、用户名、主题树召回等全部可自定义
+### 🖥️ 用户界面
+- **现代化 GUI**: 基于 PyQt5 的精美图形界面
+- **Markdown 支持**: 完整的 Markdown 语法支持
+- **主题定制**: 支持界面主题、透明度等自定义
+- **响应式设计**: 自适应不同屏幕尺寸
 
-### 系统托盘功能
-- **控制台托盘**: 使用`start_with_tray.bat`启动，可将终端窗口隐藏到系统托盘
-- **自动隐藏**: 启动后3秒自动隐藏控制台窗口
-- **任务栏隐藏**: 控制台窗口从任务栏完全隐藏
-- **托盘操作**: 右键托盘图标查看菜单，双击显示窗口
-- **自启动管理**: 支持注册表方式的自启动功能
+### 🌐 API 服务
+- **RESTful API**: 完整的 HTTP API 接口
+- **流式支持**: Server-Sent Events 流式输出
+- **自动文档**: 交互式 API 文档 (Swagger)
+- **跨域支持**: 完整的 CORS 配置
 
-### Agent系统
-- **动态服务池查询**: 系统通过扫描`agent-manifest.json`文件自动发现和注册服务
-- **AgentManager独立系统**: 支持Agent的配置加载、会话管理、消息组装和LLM调用
-- **智能占位符替换**: 支持Agent配置、环境变量、时间信息等多种占位符
-- **会话隔离与TTL管理**: 支持多用户多会话隔离，自动清理过期会话数据
+### 📱 系统托盘
+- **后台运行**: 支持最小化到系统托盘
+- **自动隐藏**: 启动后自动隐藏控制台窗口
+- **快捷操作**: 托盘图标右键菜单
+- **自启动**: 支持注册表方式的自启动功能
+
+### 🔍 智能 Agent 系统
+- **配置管理**: 统一的 Agent 配置和管理
+- **会话隔离**: 多用户会话完全隔离
+- **占位符替换**: 支持动态内容替换
+- **生命周期管理**: 完整的 Agent 生命周期管理
+
+---
+
+## 🏗️ 技术架构
+
+<div align="center">
+
+```mermaid
+graph TB
+    A[用户界面] --> B[PyQt5 GUI]
+    A --> C[Web API]
+    A --> D[语音交互]
+    
+    B --> E[对话核心]
+    C --> E
+    D --> E
+    
+    E --> F[工具调用循环]
+    F --> G[MCP 服务管理器]
+    F --> H[Agent 管理器]
+    
+    G --> I[各种 MCP 服务]
+    H --> J[各种 Agent]
+    
+    E --> K[GRAG 记忆系统]
+    K --> L[Neo4j 图数据库]
+    
+    E --> M[配置管理]
+    M --> N[config.py]
+    
+    I --> O[文件/代码/浏览器等]
+    J --> P[专业任务处理]
+```
+
+</div>
+
+### 📊 核心模块
+
+| 模块 | 功能 | 技术栈 |
+|------|------|--------|
+| **对话核心** | 处理用户输入和AI响应 | Python, OpenAI API |
+| **MCP 服务** | 工具调用和服务管理 | MCP Protocol |
+| **Agent 系统** | 专业任务处理 | 多模型支持 |
+| **记忆系统** | 知识图谱和上下文 | Neo4j, Py2neo |
+| **用户界面** | 图形交互界面 | PyQt5, Markdown |
+| **API 服务** | HTTP 接口服务 | FastAPI, Uvicorn |
+| **语音系统** | 语音合成和识别 | Edge-TTS, PyAudio |
 
 ---
 
@@ -520,6 +727,36 @@ POST /system/devmode
 GET /memory/stats
 ```
 
+## MCP服务Agent化升级说明
+
+- 所有MCP服务（如文件、代码、浏览器、应用启动、系统控制、天气等）已全部升级为标准Agent风格：
+  - 统一继承自`agents.Agent`，具备`name`、`instructions`属性和`handle_handoff`异步方法
+  - 变量全部走`config.py`统一管理，避免重复定义
+  - 注释全部中文，文件/类/函数注释一行，变量注释右侧#
+  - 支持多agent协作，ControllerAgent可智能分配任务给BrowserAgent、ContentAgent等
+  - 注册中心`mcp_registry.py`自动发现并注册所有实现了`handle_handoff`的Agent实例，支持热插拔
+  - 注册时自动输出所有已注册agent的名称和说明，便于调试
+  - 简化Agent类型：只支持`mcp`和`agent`两种类型
+
+- handoff机制全部通过`handle_handoff`异步方法调度，兼容JSON和handoff两种格式
+
+- 新增/删除agent只需增删py文件，无需重启主程序
+
+- 详细接口和参数请参考各Agent代码注释与`config.py`配置 
+
+## 更新日志
+
+- 工具调用格式已优化，改为纯JSON格式，更加简洁规范，具体示例如下：
+
+```
+{
+  "agentType": "mcp",
+  "service_name": "MCP服务名称",
+  "tool_name": "工具名称",
+  "参数名": "参数值"
+}
+```
+
 ---
 
 ## 📝 前端UI与响应适配
@@ -609,7 +846,6 @@ GET /memory/stats
 ```bash
 python check_env.py
 ```
-
 ### Windows 环境
 - **Python版本/依赖/虚拟环境/浏览器驱动等问题**: 详见`setup.ps1`与本README
 - **IDE报import错误**: 重启并选择正确解释器
@@ -677,9 +913,50 @@ python check_env.py
 
 ---
 
-## 📝 许可证
-MIT License
+## 🤝 贡献指南
+
+我们欢迎所有形式的贡献！请阅读以下指南：
+
+### 📋 贡献方式
+- **报告问题**: 使用 GitHub Issues 提交 Bug 报告
+- **功能建议**: 提出新功能的需求和建议
+- **代码贡献**: 提交 Pull Request 改进代码
+- **文档改进**: 完善项目文档和使用说明
+
+### 📝 开发规范
+- 遵循 PEP 8 代码风格
+- 添加适当的注释和文档
+- 确保代码测试通过
+- 更新相关文档
+
+### 📞 联系方式
+- **Issues**: [GitHub Issues](https://github.com/Xxiii8322766509/NagaAgent/issues)
+- **讨论**: [GitHub Discussions](https://github.com/Xxiii8322766509/NagaAgent/discussions)
 
 ---
 
-如需详细功能/API/扩展说明，见各模块注释与代码，所有变量唯一、注释中文、极致精简。 
+
+## 🙏 致谢
+
+感谢以下开源项目和贡献者：
+
+- **[OpenAI](https://openai.com/)** - 提供强大的 AI 模型
+- **[Neo4j](https://neo4j.com/)** - 图数据库支持
+- **[PyQt5](https://riverbankcomputing.com/software/pyqt/)** - GUI 框架
+- **[FastAPI](https://fastapi.tiangolo.com/)** - 现代 Web 框架
+- **[MCP](https://modelcontextprotocol.io/)** - 模型上下文协议
+- 所有贡献者和社区成员
+
+---
+
+## 📄 许可证
+
+本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
+
+<div align="center">
+
+---
+
+**⭐ 如果这个项目对您有帮助，请考虑给我们一个 Star！**
+
+</div>

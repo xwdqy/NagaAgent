@@ -6,7 +6,7 @@ authors = [
     {name = "柏斯阔落", email = "1781393885@qq.com"},
 ]
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = [
     # 核心依赖
     "mcp>=1.6.0",
@@ -18,25 +18,20 @@ dependencies = [
     "pytz>=2024.1",
     "colorama>=0.4.6",
     "python-dateutil>=2.9.0.post0",
-    
     # GRAG知识图谱相关依赖
     "py2neo>=2021.2.3",
     "pyvis>=0.3.2",
     "matplotlib>=3.10.0",
-    
     # API服务器相关依赖
     "flask-cors>=6.0.1",
     "flask>=3.1.0",
     "gevent>=25.5.1",
     "edge-tts>=7.0.2",
-    "emoji>=2.14.1",
     "fastapi>=0.115.0",
-    
     # 网络通信相关依赖
     "uvicorn[standard]>=0.34.0",
     "librosa",
-    "websockets>=14.0",  # WebSocket通信支持
-    
+    "websockets>=14.0", # WebSocket通信支持
     # AI机器学习相关依赖
     "numpy>=1.24.0,<2.0.0",
     "pandas>=2.0.0,<3.0.0",
@@ -44,7 +39,6 @@ dependencies = [
     "scikit-learn>=1.6.1",
     "scipy>=1.15.2",
     "transformers>=4.51.3",
-    
     # 数据处理相关依赖
     "pydantic>=2.11.3",
     "pydantic-settings>=2.9.1",
@@ -60,41 +54,37 @@ dependencies = [
     "urllib3>=2.4.0",
     "typing-extensions>=4.13.2",
     "markdown>=3.8",
-    
     # GUI界面相关依赖
-    "pyqt5>=5.15.11",
+    "pyqt5-qt5 ==5.15.2",
+    "pyqt5==5.15.11",
     "playwright>=1.52.0",
     "greenlet>=3.2.1",
     "pyee>=13.0.0",
     "pygame>=2.6.0",
     "html2text>=2020.1.16",
-    
     # 音频处理相关依赖
     "sounddevice>=0.4.6",
     "soundfile>=0.12.1",
     "pyaudio>=0.2.14",
-    "edge-tts>=6.1.9",
     "emoji>=2.8.0",
-    
     # 系统托盘相关依赖
     "pystray>=0.19.4",
     "pillow>=10.0.0",
-    
     # 其他工具依赖
     "tiktoken",
     "bottleneck>=1.3.6",
-    
     # 系统控制相关依赖
-    "screen-brightness-control",  # 屏幕亮度控制
-    "pycaw",  # 音频控制
-    "comtypes",  # pycaw的依赖
-    
+    "screen-brightness-control", # 屏幕亮度控制
+    "pycaw", # 音频控制
+    "comtypes", # pycaw的依赖
     # MCP工具相关依赖
-    "jmcomic>=2.6.5",  # 漫画下载工具
-    "fastmcp>=2.11.2",  # MCP工具框架
-    
+    "jmcomic>=2.6.5", # 漫画下载工具
+    "fastmcp>=2.11.2", # MCP工具框架
     # MQTT通信相关依赖
-    "paho-mqtt>=2.0.0",  # MQTT客户端库
+    "paho-mqtt>=2.0.0", # MQTT客户端库
+    # 其他依赖
+    "python-docx>=1.2.0",
+    "mqtt-tool>=0.1.1",
 ]
 
 # 可选依赖组
@@ -127,3 +117,4 @@ include = ["apiserver","mcpserver","mqtt_tool", "agent", "summer_memory", "think
 
 [tool.ruff]
 line-length = 120 
+

@@ -1,168 +1,225 @@
+# 标准库导入
 import asyncio
+import logging
 import os
+import socket
 import sys
 import threading
 import time
-import logging
 
-# 保留GRAG日志
+# 第三方库导入
+from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import QApplication
+
+# 本地模块导入
+from config import config
+from conversation_core import NagaConversation
+from summer_memory.memory_manager import memory_manager
+from summer_memory.task_manager import start_task_manager, task_manager
+from ui.pyqt_chat_window import ChatWindow
+from ui.tray.console_tray import integrate_console_tray
+
+# 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("summer_memory")
 logger.setLevel(logging.INFO)
 
-# 只过滤HTTP相关日志
+# 过滤HTTP相关日志
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-from conversation_core import NagaConversation
-
-sys.path.append(os.path.dirname(__file__))
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QApplication
-
-# 导入配置
-from config import config
-from summer_memory.memory_manager import memory_manager
-from ui.pyqt_chat_window import ChatWindow
-
-# 导入控制台托盘功能
-from ui.tray.console_tray import integrate_console_tray
-
-n=NagaConversation()
-def show_help():print('系统命令: 清屏, 查看索引, 帮助, 退出')
-def show_index():print('主题分片索引已集成，无需单独索引查看')
-def clear():os.system('cls' if os.name == 'nt' else 'clear')
-
-def check_port_available(host, port):
-    """检查端口是否可用"""
-    import socket
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind((host, port))
-            return True
-    except OSError:
-        return False
-
-def start_api_server():
-    """在后台启动API服务器"""
-    try:
-        # 检查端口是否被占用
-        if not check_port_available(config.api_server.host, config.api_server.port):
-            print(f"⚠️ 端口 {config.api_server.port} 已被占用，跳过API服务器启动")
-            return
-            
-        import uvicorn
-        # 使用字符串路径而不是直接导入，确保模块重新加载
-        # from apiserver.api_server import app
+# 服务管理器类
+class ServiceManager:
+    """服务管理器 - 统一管理所有后台服务"""
+    
+    def __init__(self):
+        self.loop = asyncio.new_event_loop()
+        self.bg_thread = None
+        self.api_thread = None
+        self.tts_thread = None
+    
+    def start_background_services(self):
+        """启动后台服务"""
+        logger.info("正在启动后台服务...")
         
-        print("🚀 正在启动夏园API服务器...")
-        print(f"📍 地址: http://{config.api_server.host}:{config.api_server.port}")
-        print(f"📚 文档: http://{config.api_server.host}:{config.api_server.port}/docs")
+        # 启动后台任务管理器
+        self.bg_thread = threading.Thread(target=self._run_event_loop, daemon=True)
+        self.bg_thread.start()
+        logger.info(f"后台服务线程已启动: {self.bg_thread.name}")
         
-        # 在新线程中启动API服务器
-        def run_server():
-            try:
-                uvicorn.run(
-                    "apiserver.api_server:app",  # 使用字符串路径
-                    host=config.api_server.host,
-                    port=config.api_server.port,
-                    log_level="error",  # 减少日志输出
-                    access_log=False,
-                    reload=False  # 确保不使用自动重载
-                )
-            except Exception as e:
-                print(f"❌ API服务器启动失败: {e}")
-        
-        api_thread = threading.Thread(target=run_server, daemon=True)
-        api_thread.start()
-        print("✅ API服务器已在后台启动")
-        
-        # 等待服务器启动
+        # 短暂等待服务初始化
         time.sleep(1)
-        
-    except ImportError as e:
-        print(f"⚠️ API服务器依赖缺失: {e}")
-        print("   请运行: pip install fastapi uvicorn")
-    except Exception as e:
-        print(f"❌ API服务器启动异常: {e}")
+    
+    def _run_event_loop(self):
+        """运行事件循环"""
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_until_complete(self._init_background_services())
+        logger.info("后台服务事件循环已启动")
+    
+    async def _init_background_services(self):
+        """初始化后台服务"""
+        logger.info("正在启动后台服务...")
+        try:
+            # 启动任务管理器
+            await start_task_manager()
+            
+            # 添加状态检查
+            logger.info(f"任务管理器状态: running={task_manager.is_running}")
+            
+            # 保持事件循环活跃
+            while True:
+                await asyncio.sleep(3600)  # 每小时检查一次
+        except Exception as e:
+            logger.error(f"后台服务异常: {e}")
+    
+    def check_port_available(self, host, port):
+        """检查端口是否可用"""
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind((host, port))
+                return True
+        except OSError:
+            return False
+    
+    def start_api_server(self):
+        """启动API服务器"""
+        try:
+            if not self.check_port_available(config.api_server.host, config.api_server.port):
+                print(f"⚠️ 端口 {config.api_server.port} 已被占用，跳过API服务器启动")
+                return
+            
+            import uvicorn
+            
+            print("🚀 正在启动夏园API服务器...")
+            print(f"📍 地址: http://{config.api_server.host}:{config.api_server.port}")
+            print(f"📚 文档: http://{config.api_server.host}:{config.api_server.port}/docs")
+            
+            def run_server():
+                try:
+                    uvicorn.run(
+                        "apiserver.api_server:app",
+                        host=config.api_server.host,
+                        port=config.api_server.port,
+                        log_level="error",
+                        access_log=False,
+                        reload=False,
+                        ws="auto"
+                    )
+                except Exception as e:
+                    print(f"❌ API服务器启动失败: {e}")
+            
+            self.api_thread = threading.Thread(target=run_server, daemon=True)
+            self.api_thread.start()
+            print("✅ API服务器已在后台启动")
+            time.sleep(1)
+            
+        except ImportError as e:
+            print(f"⚠️ API服务器依赖缺失: {e}")
+            print("   请运行: pip install fastapi uvicorn")
+        except Exception as e:
+            print(f"❌ API服务器启动异常: {e}")
+    
+    def start_tts_server(self):
+        """启动TTS服务"""
+        try:
+            if not self.check_port_available("0.0.0.0", config.tts.port):
+                print(f"⚠️ 端口 {config.tts.port} 已被占用，跳过TTS服务启动")
+                return
+            
+            print("🚀 正在启动TTS服务...")
+            print(f"📍 地址: http://127.0.0.1:{config.tts.port}")
+            
+            def run_tts():
+                try:
+                    from voice.start_voice_service import start_http_server
+                    start_http_server()
+                except Exception as e:
+                    print(f"❌ TTS服务启动失败: {e}")
+            
+            self.tts_thread = threading.Thread(target=run_tts, daemon=True)
+            self.tts_thread.start()
+            print("✅ TTS服务已在后台启动")
+            time.sleep(1)
+        except Exception as e:
+            print(f"❌ TTS服务启动异常: {e}")
+    
+    def show_naga_portal_status(self):
+        """显示NagaPortal配置状态"""
+        try:
+            if config.naga_portal.username and config.naga_portal.password:
+                print(f"🌐 NagaPortal: 已配置账户信息")
+                print(f"   地址: {config.naga_portal.portal_url}")
+                print(f"   用户: {config.naga_portal.username[:3]}***{config.naga_portal.username[-3:] if len(config.naga_portal.username) > 6 else '***'}")
+                print(f"   ⚡ 系统启动时将自动登录并保存Cookie")
+            else:
+                print(f"🌐 NagaPortal: 未配置账户信息")
+                print(f"   如需使用NagaPortal功能，请在config.json中配置naga_portal.username和password")
+        except Exception as e:
+            print(f"🌐 NagaPortal: 配置检查失败 - {e}")
 
-with open('./ui/progress.txt','w')as f:
+# 工具函数
+def show_help():
+    print('系统命令: 清屏, 查看索引, 帮助, 退出')
+
+def show_index():
+    print('主题分片索引已集成，无需单独索引查看')
+
+def clear():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+# 初始化服务管理器
+service_manager = ServiceManager()
+service_manager.start_background_services()
+
+# 创建对话实例
+n = NagaConversation()
+
+# 初始化进度文件
+with open('./ui/progress.txt', 'w') as f:
     f.write('0')
-mm = memory_manager
-#添加的GRAG相关启动说明
+
+# 显示系统状态
 print("=" * 30)
 print(f"GRAG状态: {'启用' if memory_manager.enabled else '禁用'}")
 if memory_manager.enabled:
     stats = memory_manager.get_memory_stats()
-    # 检查Neo4j连接
     from summer_memory.quintuple_graph import graph, GRAG_ENABLED
     print(f"Neo4j连接: {'成功' if graph and GRAG_ENABLED else '失败'}")
 print("=" * 30)
 
-print('='*30+'\n娜迦系统已启动\n'+'='*30)
+print('=' * 30 + '\n娜迦系统已启动\n' + '=' * 30)
 
-# 自动启动API服务器
+# 启动服务
 if config.api_server.enabled and config.api_server.auto_start:
-    start_api_server()
+    service_manager.start_api_server()
 
-def check_tts_port_available(port):
-    """检查TTS端口是否可用"""
-    import socket
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind(("0.0.0.0", port))
-            return True
-    except OSError:
-        return False
-
-def start_tts_server():
-    """在后台启动TTS服务"""
-    try:
-        if not check_tts_port_available(config.tts.port):
-            print(f"⚠️ 端口 {config.tts.port} 已被占用，跳过TTS服务启动")
-            return
-        
-        print("🚀 正在启动TTS服务...")
-        print(f"📍 地址: http://127.0.0.1:{config.tts.port}")
-        
-        def run_tts():
-            try:
-                # 使用新的启动脚本
-                from voice.start_voice_service import start_http_server
-                start_http_server()
-            except Exception as e:
-                print(f"❌ TTS服务启动失败: {e}")
-        
-        tts_thread = threading.Thread(target=run_tts, daemon=True)
-        tts_thread.start()
-        print("✅ TTS服务已在后台启动")
-        time.sleep(1)
-    except Exception as e:
-        print(f"❌ TTS服务启动异常: {e}")
-
-# 自动启动TTS服务
-start_tts_server()
-
+service_manager.start_tts_server()
+service_manager.show_naga_portal_status()
 show_help()
-loop=asyncio.new_event_loop()
-threading.Thread(target=loop.run_forever,daemon=True).start()
 
+# NagaAgent适配器
 class NagaAgentAdapter:
- def __init__(s):s.naga=NagaConversation()  # 第二次初始化：NagaAgentAdapter构造函数中创建
- async def respond_stream(s,txt):
-     async for resp in s.naga.process(txt):
-         yield "娜迦",resp,None,True,False
+    def __init__(s):
+        s.naga = NagaConversation()  # 第二次初始化：NagaAgentAdapter构造函数中创建
+    
+    async def respond_stream(s, txt):
+        async for resp in s.naga.process(txt):
+            yield "娜迦", resp, None, True, False
 
-if __name__=="__main__":
- app=QApplication(sys.argv)
- icon_path = os.path.join(os.path.dirname(__file__), "ui", "window_icon.png")
- app.setWindowIcon(QIcon(icon_path))
- 
- # 集成控制台托盘功能
- console_tray = integrate_console_tray()
- 
- win=ChatWindow()
- win.setWindowTitle("NagaAgent")
- win.show()
-
- sys.exit(app.exec_())
+# 主程序入口
+if __name__ == "__main__":
+    if not asyncio.get_event_loop().is_running():
+        asyncio.set_event_loop(asyncio.new_event_loop())
+    
+    app = QApplication(sys.argv)
+    icon_path = os.path.join(os.path.dirname(__file__), "ui", "window_icon.png")
+    app.setWindowIcon(QIcon(icon_path))
+    
+    # 集成控制台托盘功能
+    console_tray = integrate_console_tray()
+    
+    win = ChatWindow()
+    win.setWindowTitle("NagaAgent")
+    win.show()
+    
+    sys.exit(app.exec_())

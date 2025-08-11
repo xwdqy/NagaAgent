@@ -101,7 +101,7 @@ def main():
     # 检查 Python 版本
     python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
     python_ok = sys.version_info >= (3, 8)
-    all_good &= print_status(f"Python {python_version} (需要 >= 3.8)", python_ok)
+    all_good &= print_status(f"Python {python_version} (需要 >= 3.10)", python_ok)
     
     # 检查 Git
     git_ok = check_command("git")

@@ -4,7 +4,7 @@
 
 set -e  # 设置错误时停止执行
 
-PYTHON_MIN_VERSION="3.8"  # Python最低版本要求
+PYTHON_MIN_VERSION="3.10"  # Python最低版本要求
 VENV_PATH=".venv"  # 虚拟环境路径
 
 # 颜色输出函数
@@ -27,13 +27,13 @@ print_warning() {
 # 检查 Python 版本
 print_info "检查 Python 版本..."
 if ! command -v python3 &> /dev/null; then
-    print_error "未找到 python3 命令，请先安装 Python 3.8+"
+    print_error "未找到 python3 命令，请先安装 Python 3.10+"
     print_info "推荐使用 Homebrew 安装: brew install python@3.11"
     exit 1
 fi
 
 PYTHON_VERSION=$(python3 --version | grep -o '[0-9]\+\.[0-9]\+')
-REQUIRED_VERSION="3.8"
+REQUIRED_VERSION="3.10"
 
 if [[ "$(printf '%s\n' "$REQUIRED_VERSION" "$PYTHON_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]]; then
     print_error "需要 Python $PYTHON_MIN_VERSION 或更高版本，当前版本: $PYTHON_VERSION"

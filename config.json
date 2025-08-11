@@ -9,7 +9,7 @@
   },
   "api": {
     "api_key": " ",
-    "base_url": "https://phapi.furina.junmatec.cn/v1",
+    "base_url": " ",
     "model": "TIG-3.6-VL-Lite",
     "temperature": 0.7,
     "max_tokens": 2000,
@@ -61,26 +61,31 @@
     "keep_audio_files": false
   },
   "weather": {
-    "api_key": "06e5619c6e787a67ae4b9f177ab48fe2"
+    "api_key": " "
   },
   "mqtt": {
     "enabled": true,
-    "broker": " ",
+    "broker": "iot-06z00b3k4pfqzty.mqtt.iothub.aliyuncs.com",
     "port": 1878,
     "topic": " ",
     "client_id": "k28x9wMnNss.E6UtPoMxRw7iDKzQuBVE|securemode=2,signmethod=hmacsha256,timestamp=1753506912322|",
     "username": " ",
-    "password": " ",
+    "password": "6d43c5dd91a0f19517bd72161de90ba09f568db8b2655fa9a2bf714f046adb1d",
     "keepalive": 60,
     "qos": 1
   },
   "ui": {
     "user_name": "用户",
-    "bg_alpha": 0.81,
-    "window_bg_alpha": 100,
+    "bg_alpha": 0.59,
+    "window_bg_alpha": 128,
     "mac_btn_size": 36,
     "mac_btn_margin": 16,
     "mac_btn_gap": 12,
     "animation_duration": 600
+  },
+  "naga_portal": {
+    "portal_url": "https://naga.furina.chat/",
+    "username": " ",
+    "password": " "
   }
 }

@@ -1,11 +1,12 @@
 import logging
 import asyncio
 import traceback
+import weakref
 from typing import List, Dict, Optional, Tuple
 from .quintuple_extractor import extract_quintuples
 from .quintuple_graph import store_quintuples, query_graph_by_keywords, get_all_quintuples
 from .quintuple_rag_query import query_knowledge, set_context
-from .task_manager import task_manager, start_auto_cleanup
+from .task_manager import task_manager, start_auto_cleanup, start_task_manager
 from config import config
 
 logger = logging.getLogger(__name__)
@@ -21,23 +22,23 @@ class GRAGMemoryManager:
         self.recent_context = [] # 最近对话上下文
         self.extraction_cache = set() # 避免重复提取
         self.active_tasks = set() # 当前活跃的任务ID
-        
+
         if not self.enabled:
             logger.info("GRAG记忆系统已禁用")
             return
-            
+
         try:
             # 初始化Neo4j连接
             from .quintuple_graph import graph
             logger.info("GRAG记忆系统初始化成功")
-            
+
             # 启动自动清理任务
             start_auto_cleanup()
-            
+
             # 设置任务完成回调
-            task_manager.on_task_completed = self._on_task_completed
-            task_manager.on_task_failed = self._on_task_failed
-            
+            self._weak_ref = weakref.ref(self)
+            task_manager.on_task_completed = self._on_task_completed_wrapper
+
         except Exception as e:
             logger.error(f"GRAG记忆系统初始化失败: {e}")
             self.enabled = False
@@ -49,6 +50,7 @@ class GRAGMemoryManager:
         try:
             # 拼接本轮内容
             conversation_text = f"用户: {user_input}\n娜迦: {ai_response}"
+            logger.info(f"添加对话记忆: {conversation_text[:50]}...")
 
             # 更新recent_context（限制长度）
             self.recent_context.append(conversation_text)
@@ -58,40 +60,58 @@ class GRAGMemoryManager:
             # 使用任务管理器异步提取五元组
             if self.auto_extract:
                 try:
-                    task_id = task_manager.add_task(conversation_text)
+                    if not task_manager.is_running:
+                        logger.warning("任务管理器未运行，正在启动...")
+                        from .task_manager import start_task_manager
+                        await start_task_manager()
+                        await asyncio.sleep(1)  # 等待启动完成
+
+                    logger.info(f"任务管理器状态: running={task_manager.is_running}, workers={len(task_manager.worker_tasks)}")
+
+                    task_id = await task_manager.add_task(conversation_text)
                     self.active_tasks.add(task_id)
                     logger.info(f"已提交五元组提取任务: {task_id}")
+                    return True
                 except Exception as e:
                     logger.error(f"提交提取任务失败: {e}")
                     # 如果任务管理器失败，回退到同步提取
                     await self._extract_and_store_quintuples_fallback(conversation_text)
-            
+
             return True
         except Exception as e:
             logger.error(f"添加对话记忆失败: {e}")
             return False
 
+
+    def _on_task_completed_wrapper(self, task_id: str, quintuples: List):
+        """包装回调方法，处理实例可能被销毁的情况"""
+        instance = self._weak_ref()
+        if instance:
+            asyncio.run_coroutine_threadsafe(
+                instance._on_task_completed(task_id, quintuples),
+                loop=asyncio.get_event_loop()
+            )
+
     async def _on_task_completed(self, task_id: str, quintuples: List) -> None:
-        """任务完成回调"""
         try:
             self.active_tasks.discard(task_id)
             logger.info(f"任务完成回调: {task_id}, 提取到 {len(quintuples)} 个五元组")
-            
+
+            # 确保在事件循环线程中执行
             if not quintuples:
                 logger.warning(f"任务 {task_id} 未提取到五元组")
                 return
-            
-            # 存储到Neo4j
-            store_success = await asyncio.wait_for(
-                asyncio.to_thread(store_quintuples, quintuples),
-                timeout=15.0  # 15秒超时
-            )
-            
+
+            logger.debug(f"准备存储五元组: {quintuples[:2]}...")
+
+            # 直接调用同步存储函数（避免线程切换）
+            store_success = store_quintuples(quintuples)
+
             if store_success:
                 logger.info(f"任务 {task_id} 的五元组存储成功")
             else:
                 logger.error(f"任务 {task_id} 的五元组存储失败")
-                
+
         except Exception as e:
             logger.error(f"任务完成回调处理失败: {e}")
 

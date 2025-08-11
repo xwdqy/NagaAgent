@@ -373,7 +373,10 @@ class MCPManager:
                 elif hasattr(agent, tool_name):
                     method = getattr(agent, tool_name)
                     if callable(method):
-                        return await method(**args) if asyncio.iscoroutinefunction(method) else method(**args)
+                        # 过滤掉元数据字段，只保留实际参数
+                        filtered_args = {k: v for k, v in args.items() 
+                                       if k not in ['tool_name', 'service_name', 'agentType']}
+                        return await method(**filtered_args) if asyncio.iscoroutinefunction(method) else method(**filtered_args)
             
             # 最后尝试作为传统MCP服务调用
             return await self.call_service_tool(service_name, tool_name, args)

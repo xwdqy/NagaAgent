@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                             QPushButton, QLineEdit, QCheckBox, QSpinBox, 
                             QDoubleSpinBox, QComboBox, QFrame, QScrollArea,
                             QSlider, QTextEdit, QGroupBox, QGridLayout, QFileDialog)
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QPropertyAnimation, QEasingCurve
 from PyQt5.QtGui import QFont, QPainter, QColor
 import sys
 import os
@@ -111,47 +111,159 @@ class SettingCard(QWidget):
             self.value_changed.emit(self.setting_key, value)
 
 class SettingGroup(QWidget):
-    """设置组"""
+    """设置组(支持展开/收起)"""
     
     def __init__(self, title, parent=None):
         super().__init__(parent)
-        self.cards = []
-        self.setup_ui(title)
+        self.cards = []  # 卡片列表 #
+        self._title = title  # 标题文本 #
+        self._expanded = False  # 默认收起 #
+        self.setup_ui(title)  # 初始化UI #
+        self.set_collapsed(True, animate=False)  # 初始直接收起(无动画) #
         
     def setup_ui(self, title):
-        """初始化组UI"""
-        layout = QVBoxLayout(self)
+        """初始化组UI(带可点击头部)"""
+        layout = QVBoxLayout(self)  # 主布局 #
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
         
-        # 组标题
-        title_label = QLabel(title)
-        title_label.setStyleSheet("""
-            QLabel {
+        # 头部容器(按钮+右侧文本) #
+        self.header_container = QWidget()  # 容器 #
+        self.header_container.setStyleSheet(
+            """
+            QWidget {
+                background: transparent;
+                border: none;
+                border-bottom: 1px solid rgba(255, 255, 255, 30);
+                margin-bottom: 2px;
+            }
+            """
+        )
+        self.header_layout = QHBoxLayout(self.header_container)  # 水平布局 #
+        self.header_layout.setContentsMargins(0, 0, 0, 0)
+        self.header_layout.setSpacing(8)
+
+        self.header_button = QPushButton(f"▶ {title}")  # 默认收起显示右箭头 #
+        self.header_button.setCheckable(True)  # 可切换 #
+        self.header_button.setChecked(False)  # 默认未选中为收起 #
+        self.header_button.setCursor(Qt.PointingHandCursor)  # 指针手型 #
+        self.header_button.setStyleSheet(
+            """
+            QPushButton {
                 color: #fff;
                 font: 16pt 'Lucida Console';
                 font-weight: bold;
                 background: transparent;
                 border: none;
-                margin-bottom: 10px;
                 padding: 10px 0;
-                border-bottom: 1px solid rgba(255, 255, 255, 30);
+                text-align: left;
             }
-        """)
-        layout.addWidget(title_label)
+            QPushButton:hover {
+                color: #e8f6ff;
+            }
+            """
+        )
+        self.header_button.clicked.connect(self.on_header_clicked)  # 绑定点击事件 #
+        self.header_layout.addWidget(self.header_button, 0, Qt.AlignLeft)
+
+        self.header_layout.addStretch(1)  # 中间拉伸 #
+
+        self.header_right_label = QLabel("")  # 右侧文本(如版本) #
+        self.header_right_label.setStyleSheet("color: rgba(255,255,255,180); font: 10pt 'Lucida Console'; background: transparent;")
+        self.header_right_label.setVisible(False)  # 默认不显示 #
+        self.header_layout.addWidget(self.header_right_label, 0, Qt.AlignRight)
+
+        layout.addWidget(self.header_container)
         
-        # 卡片容器
+        # 卡片容器 #
         self.cards_container = QWidget()
         self.cards_layout = QVBoxLayout(self.cards_container)
         self.cards_layout.setContentsMargins(0, 0, 0, 0)
         self.cards_layout.setSpacing(4)
+        self.cards_container.setVisible(False)  # 初始隐藏 #
+        self.cards_container.setMaximumHeight(0)  # 初始高度为0用于动画 #
         
+        # 动画：最大高度属性动画 #
+        self.animation = QPropertyAnimation(self.cards_container, b"maximumHeight", self)  # 动画对象 #
+        self.animation.setDuration(220)  # 时长 #
+        self.animation.setEasingCurve(QEasingCurve.OutCubic)  # 缓动曲线 #
+        self.animation.finished.connect(self._on_animation_finished)  # 动画结束处理 #
         layout.addWidget(self.cards_container)
+        
+    def on_header_clicked(self, checked):
+        """头部点击切换展开/收起"""
+        self.set_collapsed(not checked)  # 与按钮选中状态相反为收起 #
+        
+    def set_collapsed(self, collapsed, animate=True):
+        """设置收起/展开状态"""
+        self._expanded = not collapsed  # 同步内部状态 #
+        arrow = "▼" if not collapsed else "▶"  # 箭头符号 #
+        self.header_button.setChecked(not collapsed)  # 同步按钮 #
+        self.header_button.setText(f"{arrow} {self._title}")  # 更新标题 #
+        
+        if not animate:  # 立即切换 #
+            self.cards_container.setVisible(not collapsed)  # 直接显隐 #
+            if collapsed:
+                self.cards_container.setMaximumHeight(0)  # 收起高度0 #
+            else:
+                self.cards_container.setMaximumHeight(16777215)  # 展开恢复最大 #
+            self.updateGeometry()  # 刷新布局 #
+            return
+        
+        # 动画切换 #
+        self.animation.stop()  # 停止旧动画 #
+        if collapsed:
+            # 从当前高度收起到0 #
+            self.cards_container.setVisible(True)  # 动画期间保持可见 #
+            start_h = self.cards_container.maximumHeight()  # 当前最大高度 #
+            if start_h == 16777215:
+                start_h = self.cards_container.sizeHint().height()  # 若为无穷大则取内容高度 #
+            self.animation.setStartValue(max(0, start_h))  # 起始值 #
+            self.animation.setEndValue(0)  # 结束值 #
+        else:
+            # 从0展开到内容高度 #
+            self.cards_container.setVisible(True)  # 先显示 #
+            self.cards_container.setMaximumHeight(0)  # 起始0 #
+            end_h = self.cards_container.sizeHint().height()  # 内容高度 #
+            self.animation.setStartValue(0)  # 起始值 #
+            self.animation.setEndValue(max(0, end_h))  # 结束值 #
+        self.animation.start()  # 开始动画 #
         
     def add_card(self, card):
         """添加设置卡片"""
-        self.cards.append(card)
-        self.cards_layout.addWidget(card)
+        self.cards.append(card)  # 保存引用 #
+        self.cards_layout.addWidget(card)  # 加入布局 #
+        # 若在展开状态下新增卡片，更新容器高度以避免裁剪 #
+        if self._expanded and self.cards_container.isVisible():  # 展开中 #
+            # 动态调整到新的内容高度 #
+            self.cards_container.setMaximumHeight(self.cards_container.sizeHint().height())  # 更新高度 #
+            self.updateGeometry()  # 刷新布局 #
+
+    def _on_animation_finished(self):
+        """动画结束时收尾"""
+        if self._expanded:
+            self.cards_container.setMaximumHeight(16777215)  # 展开后取消高度限制 #
+        else:
+            self.cards_container.setVisible(False)  # 收起后隐藏 #
+        self.updateGeometry()  # 刷新布局 #
+
+    def set_right_text(self, text):
+        """设置标题栏右侧文本(空则隐藏)"""
+        has_text = bool(text)
+        self.header_right_label.setVisible(has_text)
+        self.header_right_label.setText(str(text) if has_text else "")
+
+    def set_right_widget(self, widget):
+        """在标题栏右侧放置一个自定义控件(如按钮)"""
+        # 先隐藏右侧文本 #
+        self.header_right_label.setVisible(False)
+        # 移除已存在的右侧控件 #
+        if hasattr(self, 'header_right_widget') and self.header_right_widget is not None:
+            self.header_layout.removeWidget(self.header_right_widget)
+            self.header_right_widget.setParent(None)
+        self.header_right_widget = widget  # 保存引用 #
+        if widget is not None:
+            self.header_layout.addWidget(widget, 0, Qt.AlignRight)  # 添加到右侧 #
 
 class ElegantSettingsWidget(QWidget):
     """优雅的设置界面"""
@@ -207,6 +319,7 @@ class ElegantSettingsWidget(QWidget):
         
         # 创建设置组
         self.create_system_group(scroll_layout)
+        self.create_naga_portal_group(scroll_layout)
         self.create_api_group(scroll_layout)
         self.create_interface_group(scroll_layout)
         self.create_xiayuan_group(scroll_layout)
@@ -285,12 +398,9 @@ class ElegantSettingsWidget(QWidget):
 
     def create_system_group(self, parent_layout):
         group = SettingGroup("系统配置")
-        # version 只读
+        # 在标题栏最右侧显示版本号(若有) #
         if hasattr(config.system, "version"):
-            version_label = QLabel(str(config.system.version))
-            version_label.setStyleSheet("color: #fff; font: 10pt 'Lucida Console';")  # 和历史轮数一样的字体大小
-            version_card = SettingCard("系统版本", "当前系统版本号", version_label, None)
-            group.add_card(version_card)
+            group.set_right_text(f"v{config.system.version}")
         
         # 访问娜迦API
         naga_api_btn = QPushButton("访问娜迦API")
@@ -344,6 +454,55 @@ class ElegantSettingsWidget(QWidget):
             log_card.value_changed.connect(self.on_setting_changed)
             group.add_card(log_card)
             self.log_combo = log_combo
+        group.set_collapsed(True)  # 默认收起系统配置 #
+        parent_layout.addWidget(group)
+
+    def create_naga_portal_group(self, parent_layout):
+        group = SettingGroup("娜迦官网API申请")  # 折叠组 #
+
+        # 标题栏右侧跳转按钮 #
+        portal_btn = QPushButton("访问官网")
+        portal_btn.setStyleSheet(
+            """
+            QPushButton {
+                background: rgba(100, 200, 255, 150);
+                color: #fff;
+                border: 1px solid rgba(255, 255, 255, 50);
+                border-radius: 6px;
+                padding: 6px 12px;
+                font: 10pt 'Lucida Console';
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                border: 1px solid rgba(255, 255, 255, 80);
+                background: rgba(120, 220, 255, 180);
+            }
+            QPushButton:pressed {
+                background: rgba(80, 180, 255, 200);
+            }
+            """
+        )
+        portal_btn.clicked.connect(self.open_naga_api)  # 复用原跳转 #
+        group.set_right_widget(portal_btn)  # 放置在右侧 #
+
+        # 用户名 #
+        naga_user_input = QLineEdit()
+        naga_user_input.setText(getattr(config.naga_portal, 'username', ''))
+        naga_user_input.setStyleSheet(self.get_input_style() + "color: #fff;")
+        naga_user_card = SettingCard("用户名", "娜迦官网登录用户名", naga_user_input, "naga_portal.username")
+        naga_user_card.value_changed.connect(self.on_setting_changed)
+        group.add_card(naga_user_card)
+
+        # 密码 #
+        naga_pwd_input = QLineEdit()
+        naga_pwd_input.setText(getattr(config.naga_portal, 'password', ''))
+        naga_pwd_input.setEchoMode(QLineEdit.Password)
+        naga_pwd_input.setStyleSheet(self.get_input_style() + "color: #fff;")
+        naga_pwd_card = SettingCard("密码", "娜迦官网登录密码", naga_pwd_input, "naga_portal.password")
+        naga_pwd_card.value_changed.connect(self.on_setting_changed)
+        group.add_card(naga_pwd_card)
+
+        group.set_collapsed(True)  # 默认收起 #
         parent_layout.addWidget(group)
 
     def create_interface_group(self, parent_layout):
@@ -659,8 +818,16 @@ class ElegantSettingsWidget(QWidget):
         
     def on_setting_changed(self, setting_key, value):
         """处理设置变化"""
-        self.pending_changes[setting_key] = value
-        self.update_status_label(f"● {setting_key} 已修改")
+        # 统一转换为新式键名，兼容旧逻辑 #
+        key_map = {
+            "STREAM_MODE": "system.stream_mode",
+            "BG_ALPHA": "ui.bg_alpha",
+            "VOICE_ENABLED": "system.voice_enabled",
+            "DEBUG": "system.debug",
+        }
+        normalized_key = key_map.get(setting_key, setting_key)
+        self.pending_changes[normalized_key] = value
+        self.update_status_label(f"● {normalized_key} 已修改")
         
     def update_status_label(self, text):
         """更新状态标签"""

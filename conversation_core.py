@@ -1,67 +1,76 @@
+# 标准库导入
+import asyncio
+import json
 import logging
 import os
-# import asyncio # 日志与系统
-from datetime import datetime # 时间
-from mcpserver.mcp_manager import get_mcp_manager # 多功能管理
-from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX # handoff提示词
-# from mcpserver.agent_playwright_master import ControllerAgent, BrowserAgent, ContentAgent # 导入浏览器相关类
-from openai import OpenAI,AsyncOpenAI # LLM
-# import difflib # 模糊匹配
+import re
 import sys
-import json
+import time
 import traceback
-import time # 时间戳打印
-import re # 添加re模块导入
-from typing import List, Dict # 修复List未导入
-# 恢复树状思考系统导入
-from thinking import TreeThinkingEngine # 树状思考引擎
-from thinking.config import COMPLEX_KEYWORDS # 复杂关键词
-from config import config
-# 导入独立的工具调用模块
+from datetime import datetime
+from typing import List, Dict
+
+# 第三方库导入
+from openai import OpenAI, AsyncOpenAI
+
+# 本地模块导入
 from apiserver.tool_call_utils import parse_tool_calls, execute_tool_calls, tool_call_loop
+from config import config
+from mcpserver.mcp_manager import get_mcp_manager
+from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
+from thinking import TreeThinkingEngine
+from thinking.config import COMPLEX_KEYWORDS
+
+# 配置日志系统
+def setup_logging():
+    """统一配置日志系统"""
+    log_level = getattr(logging, config.system.log_level.upper(), logging.INFO)
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[logging.StreamHandler(sys.stderr)]
+    )
+    
+    # 设置第三方库日志级别
+    for logger_name in ["httpcore.connection", "httpcore.http11", "httpx", "openai._base_client", "asyncio"]:
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
+
+setup_logging()
+logger = logging.getLogger("NagaConversation")
+
+# 全局状态管理
+class SystemState:
+    """系统状态管理器"""
+    _tree_thinking_initialized = False
+    _mcp_services_initialized = False
+    _voice_enabled_logged = False
+    _memory_initialized = False
 
 # GRAG记忆系统导入
-if config.grag.enabled:
+def init_memory_manager():
+    """初始化GRAG记忆系统"""
+    if not config.grag.enabled:
+        return None
+    
     try:
         from summer_memory.memory_manager import memory_manager
         print("[GRAG] ✅ 夏园记忆系统初始化成功")
+        return memory_manager
     except Exception as e:
-        logger = logging.getLogger("NagaConversation")
         logger.error(f"夏园记忆系统加载失败: {e}")
-        memory_manager = None
-else:
-    memory_manager = None
+        return None
 
+memory_manager = init_memory_manager()
+
+# 工具函数
 def now():
-    return time.strftime('%H:%M:%S:')+str(int(time.time()*1000)%10000) # 当前时间
-_builtin_print=print
+    """获取当前时间戳"""
+    return time.strftime('%H:%M:%S:') + str(int(time.time() * 1000) % 10000)
+
+_builtin_print = print
 def print(*a, **k):
-    return sys.stderr.write('[print] '+(' '.join(map(str,a)))+'\n')
-
-# 配置日志 - 使用统一配置系统的日志级别
-log_level = getattr(logging, config.system.log_level.upper(), logging.INFO)
-logging.basicConfig(
-    level=log_level,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stderr)
-    ]
-)
-
-# 特别设置httpcore和openai的日志级别，减少连接异常噪音
-logging.getLogger("httpcore.connection").setLevel(logging.WARNING)
-logging.getLogger("httpcore.http11").setLevel(logging.WARNING)  # 屏蔽HTTP请求DEBUG
-logging.getLogger("httpx").setLevel(logging.WARNING)  # 屏蔽httpx DEBUG
-logging.getLogger("openai._base_client").setLevel(logging.WARNING)
-# 隐藏asyncio的DEBUG日志
-logging.getLogger("asyncio").setLevel(logging.WARNING)
-logger = logging.getLogger("NagaConversation")
-
-# _MCP_HANDOFF_REGISTERED=False  # 已移除，不再需要
-_TREE_THINKING_SUBSYSTEMS_INITIALIZED=False
-_MCP_SERVICES_INITIALIZED=False
-
-_VOICE_ENABLED_LOGGED=False
+    """自定义打印函数"""
+    return sys.stderr.write('[print] ' + (' '.join(map(str, a))) + '\n')
 
 class NagaConversation: # 对话主类
     def __init__(self):
@@ -76,9 +85,9 @@ class NagaConversation: # 对话主类
         
         # 初始化GRAG记忆系统（只在首次初始化时显示日志）
         self.memory_manager = memory_manager
-        if self.memory_manager and not hasattr(self.__class__, '_memory_initialized'):
+        if self.memory_manager and not SystemState._memory_initialized:
             logger.info("夏园记忆系统已初始化")
-            self.__class__._memory_initialized = True
+            SystemState._memory_initialized = True
         
         # 初始化语音处理系统
         self.voice = None
@@ -87,10 +96,9 @@ class NagaConversation: # 对话主类
                 # 语音功能已迁移到voice_integration.py，由ui/enhanced_worker.py调用
                 # 不再需要在这里初始化VoiceHandler
                 # 使用全局变量避免重复输出日志
-                global _VOICE_ENABLED_LOGGED
-                if not _VOICE_ENABLED_LOGGED:
+                if not SystemState._voice_enabled_logged:
                     logger.info("语音功能已启用，由UI层管理")
-                    _VOICE_ENABLED_LOGGED = True
+                    SystemState._voice_enabled_logged = True
             except Exception as e:
                 logger.warning(f"语音系统初始化失败: {e}")
                 self.voice = None
@@ -98,12 +106,11 @@ class NagaConversation: # 对话主类
         # 恢复树状思考系统
         self.tree_thinking = None
         # 集成树状思考系统（参考handoff的全局变量保护机制）
-        global _TREE_THINKING_SUBSYSTEMS_INITIALIZED
-        if not _TREE_THINKING_SUBSYSTEMS_INITIALIZED:
+        if not SystemState._tree_thinking_initialized:
             try:
                 self.tree_thinking = TreeThinkingEngine(api_client=self, memory_manager=self.memory_manager)
                 print("[TreeThinkingEngine] ✅ 树状外置思考系统初始化成功")
-                _TREE_THINKING_SUBSYSTEMS_INITIALIZED = True
+                SystemState._tree_thinking_initialized = True
             except Exception as e:
                 logger.warning(f"树状思考系统初始化失败: {e}")
                 self.tree_thinking = None
@@ -114,22 +121,72 @@ class NagaConversation: # 对话主类
             except Exception as e:
                 logger.warning(f"树状思考系统实例创建失败: {e}")
                 self.tree_thinking = None
-        
 
+        self.loop = asyncio.get_event_loop()
 
     def _init_mcp_services(self):
         """初始化MCP服务系统（只在首次初始化时输出日志，后续静默）"""
-        global _MCP_SERVICES_INITIALIZED
-        if _MCP_SERVICES_INITIALIZED:
+        if SystemState._mcp_services_initialized:
             # 静默跳过，不输出任何日志
             return
         try:
             # 自动注册所有MCP服务和handoff
             self.mcp.auto_register_services()
             logger.info("MCP服务系统初始化完成")
-            _MCP_SERVICES_INITIALIZED = True
+            SystemState._mcp_services_initialized = True
+            
+            # 异步启动NagaPortal自动登录
+            self._start_naga_portal_auto_login()
         except Exception as e:
             logger.error(f"MCP服务系统初始化失败: {e}")
+    
+    def _start_naga_portal_auto_login(self):
+        """启动NagaPortal自动登录（异步）"""
+        try:
+            # 检查是否配置了NagaPortal
+            if not config.naga_portal.username or not config.naga_portal.password:
+                logger.info("ℹ️ 未配置NagaPortal账户信息，跳过自动登录")
+                return
+            
+            # 在新线程中异步执行登录
+            def run_auto_login():
+                try:
+                    import sys
+                    import os
+                    # 添加项目根目录到Python路径
+                    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    sys.path.insert(0, project_root)
+                    
+                    from mcpserver.agent_naga_portal.portal_login_manager import auto_login_naga_portal
+                    
+                    # 创建新的事件循环
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    
+                    try:
+                        # 执行自动登录
+                        result = loop.run_until_complete(auto_login_naga_portal())
+                        
+                        if result['success']:
+                            logger.info("✅ NagaPortal自动登录成功")
+                            if result.get('data', {}).get('cookie_count', 0) > 0:
+                                logger.info(f"   已保存 {result['data']['cookie_count']} 个Cookie供后续使用")
+                        else:
+                            logger.warning(f"⚠️ NagaPortal自动登录失败: {result.get('message', '未知错误')}")
+                    finally:
+                        loop.close()
+                        
+                except Exception as e:
+                    logger.error(f"❌ NagaPortal自动登录异常: {e}")
+            
+            # 启动后台线程
+            import threading
+            login_thread = threading.Thread(target=run_auto_login, daemon=True)
+            login_thread.start()
+            
+        except Exception as e:
+            logger.error(f"NagaPortal自动登录启动失败: {e}")
 
     def save_log(self, u, a):  # 保存对话日志
         if self.dev_mode:
@@ -342,19 +399,7 @@ class NagaConversation: # 对话主类
             # 只在语音输入时显示处理提示
             if is_voice_input:
                 print(f"开始处理用户输入：{now()}")  # 语音转文本结束，开始处理
-            
-            # 完全禁用GRAG记忆查询
-            # GRAG记忆查询
-            # memory_context = ""
-            # if self.memory_manager:
-            #     try:
-            #         memory_result = await self.memory_manager.query_memory(u)
-            #         if memory_result:
-            #             # memory_context = f"\n[记忆检索结果]: {memory_result}\n"
-            #             logger.info("从GRAG记忆中检索到相关信息")
-            #     except Exception as e:
-            #         logger.error(f"GRAG记忆查询失败: {e}")
-            
+                     
             # 添加handoff提示词
             system_prompt = f"{RECOMMENDED_PROMPT_PREFIX}\n{config.prompts.naga_system_prompt}"
             

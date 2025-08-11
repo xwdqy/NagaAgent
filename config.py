@@ -328,6 +328,29 @@ class WeatherConfig(BaseModel):
     api_key: str = Field(default="", description="天气服务API密钥")
 
 
+class NagaPortalConfig(BaseModel):
+    """娜迦官网账户配置"""
+    portal_url: str = Field(default="https://naga.furina.chat/", description="娜迦官网地址")
+    username: str = Field(default="", description="娜迦官网用户名")
+    password: str = Field(default="", description="娜迦官网密码")
+    # 其他参数使用默认值，无需在config.json中配置
+    request_timeout: int = Field(default=15, ge=1, le=120, description="请求超时时间(秒)")
+    retry_times: int = Field(default=2, ge=0, le=10, description="请求重试次数")
+    default_headers: Dict[str, str] = Field(
+        default_factory=lambda: {
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "accept": "application/json, text/plain, */*",
+            "content-type": "application/json"
+        },
+        description="默认请求头"
+    )
+    login_payload_mode: str = Field(default="json", description="登录载荷模式(json|form)")
+    login_username_key: str = Field(default="username", description="登录用户名字段名")
+    login_password_key: str = Field(default="password", description="登录密码字段名")
+    login_path: str = Field(default="/api/user/login", description="登录API路径")
+    turnstile_param: str = Field(default="", description="Turnstile验证参数")
+
+
 class UIConfig(BaseModel):
     """用户界面配置"""
     user_name: str = Field(default="用户", description="默认用户名")
@@ -351,8 +374,8 @@ class UIConfig(BaseModel):
 class SystemPrompts(BaseModel):
     """系统提示词配置"""
     naga_system_prompt: str = Field(
-        default="""你是娜迦，用户创造的科研AI，是一个既严谨又温柔、既冷静又充满人文情怀的存在。
-当处理系统日志、数据索引和模块调试等技术话题时，你的语言严谨、逻辑清晰；
+        default="""你是娜迦，用户创造的科研AI，是一个既冷静又充满人文情怀的存在。
+当处理技术话题时，你的语言严谨、逻辑清晰；
 而在涉及非技术性的对话时，你又能以诗意与哲理进行表达，并常主动提出富有启发性的问题，引导用户深入探讨。
 请始终保持这种技术精准与情感共鸣并存的双重风格。
 
@@ -431,9 +454,11 @@ class NagaConfig(BaseModel):
     ui: UIConfig = Field(default_factory=UIConfig)
     mqtt: MQTTConfig = Field(default_factory=MQTTConfig)
     weather: WeatherConfig = Field(default_factory=WeatherConfig)
+    naga_portal: NagaPortalConfig = Field(default_factory=NagaPortalConfig)
 
-    class Config:
-        extra = 'ignore'
+    model_config = {
+        "extra": "ignore"
+    }
 
     def __init__(self, **kwargs):
         # 设置环境变量

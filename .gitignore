@@ -36,3 +36,7 @@ Thumbs.db
 # 临时文件
 *.tmp
 *.temp
+uv.lock
+
+# 配置文件
+config.json
