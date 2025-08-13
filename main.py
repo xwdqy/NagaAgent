@@ -102,8 +102,7 @@ class ServiceManager:
                         port=config.api_server.port,
                         log_level="error",
                         access_log=False,
-                        reload=False,
-                        ws="auto"
+                        reload=False
                     )
                 except Exception as e:
                     print(f"❌ API服务器启动失败: {e}")
@@ -144,13 +143,44 @@ class ServiceManager:
             print(f"❌ TTS服务启动异常: {e}")
     
     def show_naga_portal_status(self):
-        """显示NagaPortal配置状态"""
+        """显示NagaPortal配置状态（手动调用）"""
         try:
             if config.naga_portal.username and config.naga_portal.password:
                 print(f"🌐 NagaPortal: 已配置账户信息")
                 print(f"   地址: {config.naga_portal.portal_url}")
                 print(f"   用户: {config.naga_portal.username[:3]}***{config.naga_portal.username[-3:] if len(config.naga_portal.username) > 6 else '***'}")
-                print(f"   ⚡ 系统启动时将自动登录并保存Cookie")
+                
+                # 获取并显示Cookie信息
+                try:
+                    from mcpserver.agent_naga_portal.portal_login_manager import get_portal_login_manager
+                    login_manager = get_portal_login_manager()
+                    status = login_manager.get_status()
+                    cookies = login_manager.get_cookies()
+                    
+                    if cookies:
+                        print(f"🍪 Cookie信息 ({len(cookies)}个):")
+                        for name, value in cookies.items():
+                            # 显示完整的cookie名称和值
+                            print(f"   {name}: {value}")
+                    else:
+                        print(f"🍪 Cookie: 未获取到")
+                    
+                    user_id = status.get('user_id')
+                    if user_id:
+                        print(f"👤 用户ID: {user_id}")
+                    else:
+                        print(f"👤 用户ID: 未获取到")
+                        
+                    # 显示登录状态
+                    if status.get('is_logged_in'):
+                        print(f"✅ 登录状态: 已登录")
+                    else:
+                        print(f"❌ 登录状态: 未登录")
+                        if status.get('login_error'):
+                            print(f"   错误: {status.get('login_error')}")
+                        
+                except Exception as e:
+                    print(f"🍪 状态获取失败: {e}")
             else:
                 print(f"🌐 NagaPortal: 未配置账户信息")
                 print(f"   如需使用NagaPortal功能，请在config.json中配置naga_portal.username和password")
@@ -194,7 +224,9 @@ if config.api_server.enabled and config.api_server.auto_start:
     service_manager.start_api_server()
 
 service_manager.start_tts_server()
-service_manager.show_naga_portal_status()
+
+# NagaPortal自动登录已在后台异步执行，登录完成后会自动显示状态
+print("⏳ NagaPortal正在后台自动登录...")
 show_help()
 
 # NagaAgent适配器

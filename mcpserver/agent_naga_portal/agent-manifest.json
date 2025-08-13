@@ -2,7 +2,7 @@
   "name": "NagaPortalAgent",
   "displayName": "娜迦官网API Agent",
   "version": "0.1.0",
-  "description": "与娜迦官网API进行交互的MCP服务（需登录），提供登录/GET/POST/登出/获取用户信息的基础骨架。",
+  "description": "与娜迦官网API进行交互的MCP服务（充值功能）",
   "author": "NagaAgent",
   "agentType": "mcp",
   "entryPoint": {
@@ -21,49 +21,29 @@
   "capabilities": {
     "invocationCommands": [
       {
-        "command": "set_bearer_token",
-        "description": "设置Bearer Token到默认请求头；参数：token（必填）",
-        "example": "{\"tool_name\":\"set_bearer_token\",\"token\":\"xxx\"}"
+        "command": "naga_recharge",
+        "description": "额度充值；参数：amount（必填，充值金额）、payment_type（可选，支付方式，默认wxpay，支持wxpay/alipay）",
+        "example": "{\"tool_name\":\"naga_recharge\",\"amount\":\"11.00\",\"payment_type\":\"wxpay\"}"
       },
       {
-        "command": "set_headers",
-        "description": "批量更新默认请求头；参数：headers对象",
-        "example": "{\"tool_name\":\"set_headers\",\"headers\":{\"x-api-key\":\"xxx\"}}"
+        "command": "naga_redeem_code",
+        "description": "兑换码使用；参数：key（必填，兑换码）",
+        "example": "{\"tool_name\":\"naga_redeem_code\",\"key\":\"aaaa\"}"
       },
       {
-        "command": "set_cookies",
-        "description": "批量更新默认cookies；参数：cookies对象",
-        "example": "{\"tool_name\":\"set_cookies\",\"cookies\":{\"sid\":\"abc\"}}"
+        "command": "naga_balance",
+        "description": "余额查询；无需参数",
+        "example": "{\"tool_name\":\"naga_balance\"}"
       },
       {
-        "command": "naga_request",
-        "description": "通用请求；参数：method(默认GET)、path(必填)、params/json/headers(可选)",
-        "example": "{\"tool_name\":\"naga_request\",\"method\":\"POST\",\"path\":\"/api/echo\",\"json\":{\"a\":1}}"
+        "command": "naga_apply_token",
+        "description": "智能申请API令牌；参数：name（可选，令牌名称）、group（可选，模型组）、unlimited_quota（可选，是否无限制额度，默认true）。如果不提供参数，会返回可用模型列表供选择",
+        "example": "{\"tool_name\":\"naga_apply_token\"}"
       },
       {
-        "command": "naga_login",
-        "description": "使用config.naga_portal的用户名/密码登录官网；可选参数：username、password、login_path（默认/api/user/login）",
-        "example": "{\"tool_name\":\"naga_login\"}"
-      },
-      {
-        "command": "naga_get",
-        "description": "向官网发起GET请求测试；参数：path（以/开头，必填）、params（可选对象）",
-        "example": "{\"tool_name\":\"naga_get\",\"path\":\"/api/profile\"}"
-      },
-      {
-        "command": "naga_post",
-        "description": "向官网发起POST请求测试；参数：path（以/开头，必填）、json（可选对象）",
-        "example": "{\"tool_name\":\"naga_post\",\"path\":\"/api/echo\",\"json\":{\"ping\":\"pong\"}}"
-      },
-      {
-        "command": "get_user_info",
-        "description": "获取当前登录用户信息（占位实现，默认请求/api/profile）",
-        "example": "{\"tool_name\":\"get_user_info\"}"
-      },
-      {
-        "command": "naga_logout",
-        "description": "登出并清理本地会话",
-        "example": "{\"tool_name\":\"naga_logout\"}"
+        "command": "naga_get_tokens",
+        "description": "获取已配置的API令牌列表；无需参数",
+        "example": "{\"tool_name\":\"naga_get_tokens\"}"
       }
     ]
   },
@@ -71,16 +51,12 @@
     "type": "object",
     "properties": {
       "tool_name": {"type": "string"},
-      "method": {"type": "string"},
-      "username": {"type": "string"},
-      "password": {"type": "string"},
-      "login_path": {"type": "string"},
-      "path": {"type": "string"},
-      "params": {"type": "object"},
-      "json": {"type": "object"},
-      "headers": {"type": "object"},
-      "cookies": {"type": "object"},
-      "token": {"type": "string"}
+      "amount": {"type": "string"},
+      "payment_type": {"type": "string"},
+      "key": {"type": "string"},
+      "name": {"type": "string"},
+      "group": {"type": "string"},
+      "unlimited_quota": {"type": "boolean"}
     },
     "required": ["tool_name"]
   },

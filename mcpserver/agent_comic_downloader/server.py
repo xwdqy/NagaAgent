@@ -210,7 +210,13 @@ def start_server(host: str = "localhost", port: int = 8080):
         port: 端口号
     """
     logger.info(f"启动Comic Downloader MCP服务器: http://{host}:{port}")
-    uvicorn.run(app, host=host, port=port)
+    uvicorn.run(
+        app, 
+        host=host, 
+        port=port,
+        ws_ping_interval=None,
+        ws_ping_timeout=None
+    )
 
 if __name__ == "__main__":
     start_server() 

@@ -848,5 +848,7 @@ if __name__ == "__main__":
         host=args.host,
         port=args.port,
         reload=args.reload,
-        log_level="info"
+        log_level="info",
+        ws_ping_interval=None,
+        ws_ping_timeout=None
     ) 

@@ -268,6 +268,9 @@ class DifficultyConfig(BaseModel):
     """问题难度判断配置"""
     enabled: bool = Field(default=False, description="是否启用难度判断")  # 关闭难度判断
     use_small_model: bool = Field(default=False, description="使用小模型进行难度判断")
+    pre_assessment: bool = Field(default=False, description="是否启用前置难度判断")  # 关闭前置判断
+    assessment_timeout: float = Field(default=1.0, ge=0.1, le=5.0, description="难度判断超时时间（秒）")
+    deep_thinking_threshold: int = Field(default=3, ge=1, le=5, description="启用深度思考的难度阈值")
     difficulty_levels: List[str] = Field(
         default=["简单", "中等", "困难", "极难"],
         description="难度级别"

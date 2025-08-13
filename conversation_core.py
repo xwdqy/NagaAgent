@@ -18,7 +18,7 @@ from apiserver.tool_call_utils import parse_tool_calls, execute_tool_calls, tool
 from config import config
 from mcpserver.mcp_manager import get_mcp_manager
 from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
-from thinking import TreeThinkingEngine
+# from thinking import TreeThinkingEngine
 from thinking.config import COMPLEX_KEYWORDS
 
 # 配置日志系统
@@ -103,24 +103,24 @@ class NagaConversation: # 对话主类
                 logger.warning(f"语音系统初始化失败: {e}")
                 self.voice = None
         
-        # 恢复树状思考系统
+        # 禁用树状思考系统
         self.tree_thinking = None
-        # 集成树状思考系统（参考handoff的全局变量保护机制）
-        if not SystemState._tree_thinking_initialized:
-            try:
-                self.tree_thinking = TreeThinkingEngine(api_client=self, memory_manager=self.memory_manager)
-                print("[TreeThinkingEngine] ✅ 树状外置思考系统初始化成功")
-                SystemState._tree_thinking_initialized = True
-            except Exception as e:
-                logger.warning(f"树状思考系统初始化失败: {e}")
-                self.tree_thinking = None
-        else:
-            # 如果子系统已经初始化过，创建新实例但不重新初始化子系统（静默处理）
-            try:
-                self.tree_thinking = TreeThinkingEngine(api_client=self, memory_manager=self.memory_manager)
-            except Exception as e:
-                logger.warning(f"树状思考系统实例创建失败: {e}")
-                self.tree_thinking = None
+        # 注释掉树状思考系统初始化
+        # if not SystemState._tree_thinking_initialized:
+        #     try:
+        #         self.tree_thinking = TreeThinkingEngine(api_client=self, memory_manager=self.memory_manager)
+        #         print("[TreeThinkingEngine] ✅ 树状外置思考系统初始化成功")
+        #         SystemState._tree_thinking_initialized = True
+        #     except Exception as e:
+        #         logger.warning(f"树状思考系统初始化失败: {e}")
+        #         self.tree_thinking = None
+        # else:
+        #     # 如果子系统已经初始化过，创建新实例但不重新初始化子系统（静默处理）
+        #     try:
+        #         self.tree_thinking = TreeThinkingEngine(api_client=self, memory_manager=self.memory_manager)
+        #     except Exception as e:
+        #         logger.warning(f"树状思考系统实例创建失败: {e}")
+        #         self.tree_thinking = None
 
         self.loop = asyncio.get_event_loop()
 
@@ -145,8 +145,7 @@ class NagaConversation: # 对话主类
         try:
             # 检查是否配置了NagaPortal
             if not config.naga_portal.username or not config.naga_portal.password:
-                logger.info("ℹ️ 未配置NagaPortal账户信息，跳过自动登录")
-                return
+                return  # 静默跳过，不输出日志
             
             # 在新线程中异步执行登录
             def run_auto_login():
@@ -169,16 +168,21 @@ class NagaConversation: # 对话主类
                         result = loop.run_until_complete(auto_login_naga_portal())
                         
                         if result['success']:
-                            logger.info("✅ NagaPortal自动登录成功")
-                            if result.get('data', {}).get('cookie_count', 0) > 0:
-                                logger.info(f"   已保存 {result['data']['cookie_count']} 个Cookie供后续使用")
+                            # 登录成功，显示状态
+                            print("✅ NagaPortal自动登录成功")
+                            self._show_naga_portal_status()
                         else:
-                            logger.warning(f"⚠️ NagaPortal自动登录失败: {result.get('message', '未知错误')}")
+                            # 登录失败，显示错误
+                            error_msg = result.get('message', '未知错误')
+                            print(f"❌ NagaPortal自动登录失败: {error_msg}")
+                            self._show_naga_portal_status()
                     finally:
                         loop.close()
                         
                 except Exception as e:
-                    logger.error(f"❌ NagaPortal自动登录异常: {e}")
+                    # 登录异常，显示错误
+                    print(f"❌ NagaPortal自动登录异常: {e}")
+                    self._show_naga_portal_status()
             
             # 启动后台线程
             import threading
@@ -186,8 +190,46 @@ class NagaConversation: # 对话主类
             login_thread.start()
             
         except Exception as e:
-            logger.error(f"NagaPortal自动登录启动失败: {e}")
+            # 启动异常，显示错误
+            print(f"❌ NagaPortal自动登录启动失败: {e}")
+            self._show_naga_portal_status()
 
+    def _show_naga_portal_status(self):
+        """显示NagaPortal状态（登录完成后调用）"""
+        try:
+            from mcpserver.agent_naga_portal.portal_login_manager import get_portal_login_manager
+            login_manager = get_portal_login_manager()
+            status = login_manager.get_status()
+            cookies = login_manager.get_cookies()
+            
+            print(f"🌐 NagaPortal状态:")
+            print(f"   地址: {config.naga_portal.portal_url}")
+            print(f"   用户: {config.naga_portal.username[:3]}***{config.naga_portal.username[-3:] if len(config.naga_portal.username) > 6 else '***'}")
+            
+            if cookies:
+                print(f"🍪 Cookie信息 ({len(cookies)}个):")
+                for name, value in cookies.items():
+                    print(f"   {name}: {value}")
+            else:
+                print(f"🍪 Cookie: 未获取到")
+            
+            user_id = status.get('user_id')
+            if user_id:
+                print(f"👤 用户ID: {user_id}")
+            else:
+                print(f"👤 用户ID: 未获取到")
+                
+            # 显示登录状态
+            if status.get('is_logged_in'):
+                print(f"✅ 登录状态: 已登录")
+            else:
+                print(f"❌ 登录状态: 未登录")
+                if status.get('login_error'):
+                    print(f"   错误: {status.get('login_error')}")
+                    
+        except Exception as e:
+            print(f"🍪 NagaPortal状态获取失败: {e}")
+    
     def save_log(self, u, a):  # 保存对话日志
         if self.dev_mode:
             return  # 开发者模式不写日志
@@ -414,12 +456,12 @@ class NagaConversation: # 对话主类
 
             print(f"GTP请求发送：{now()}")  # AI请求前
             
-            # 非线性思考判断：启动后台异步判断任务
-            thinking_task = None
-            if hasattr(self, 'tree_thinking') and self.tree_thinking and getattr(self.tree_thinking, 'is_enabled', False):
-                # 启动异步思考判断任务
-                import asyncio
-                thinking_task = asyncio.create_task(self._async_thinking_judgment(u))
+            # 禁用非线性思考判断
+            # thinking_task = None
+            # if hasattr(self, 'tree_thinking') and self.tree_thinking and getattr(self.tree_thinking, 'is_enabled', False):
+            #     # 启动异步思考判断任务
+            #     import asyncio
+            #     thinking_task = asyncio.create_task(self._async_thinking_judgment(u))
             
             # 普通模式：走工具调用循环（根据配置决定是否流式）
             try:
@@ -452,39 +494,39 @@ class NagaConversation: # 对话主类
                     except Exception as e:
                         logger.error(f"GRAG记忆存储失败: {e}")
                 
-                # 检查异步思考判断结果，如果建议深度思考则提示用户
-                if thinking_task and not thinking_task.done():
-                    # 等待思考判断完成（最多等待3秒）
-                    try:
-                        await asyncio.wait_for(thinking_task, timeout=3.0)
-                        if thinking_task.result():
-                            yield ("娜迦", "\n💡 这个问题较为复杂，下面我会更详细地解释这个流程...")
-                            # 启动深度思考
-                            try:
-                                thinking_result = await self.tree_thinking.think_deeply(u)
-                                if thinking_result and "answer" in thinking_result:
-                                    # 直接使用thinking系统的结果，避免重复处理
-                                    yield ("娜迦", f"\n{thinking_result['answer']}")
-                                    
-                                    # 更新对话历史
-                                    final_thinking_answer = thinking_result['answer']
-                                    self.messages[-1] = {"role": "assistant", "content": final_content + "\n\n" + final_thinking_answer}
-                                    self.save_log(u, final_content + "\n\n" + final_thinking_answer)
-                                    
-                                    # GRAG记忆存储（开发者模式不写入）
-                                    if self.memory_manager and not self.dev_mode:
-                                        try:
-                                            await self.memory_manager.add_conversation_memory(u, final_content + "\n\n" + final_thinking_answer)
-                                        except Exception as e:
-                                            logger.error(f"GRAG记忆存储失败: {e}")
-                            except Exception as e:
-                                logger.error(f"深度思考处理失败: {e}")
-                                yield ("娜迦", f"🌳 深度思考系统出错: {str(e)}")
-                    except asyncio.TimeoutError:
-                        # 超时取消任务
-                        thinking_task.cancel()
-                    except Exception as e:
-                        logger.debug(f"思考判断任务异常: {e}")
+                # 禁用异步思考判断结果检查
+                # if thinking_task and not thinking_task.done():
+                #     # 等待思考判断完成（最多等待3秒）
+                #     try:
+                #         await asyncio.wait_for(thinking_task, timeout=3.0)
+                #         if thinking_task.result():
+                #             yield ("娜迦", "\n💡 这个问题较为复杂，下面我会更详细地解释这个流程...")
+                #             # 启动深度思考
+                #             try:
+                #                 thinking_result = await self.tree_thinking.think_deeply(u)
+                #                 if thinking_result and "answer" in thinking_result:
+                #                     # 直接使用thinking系统的结果，避免重复处理
+                #                     yield ("娜迦", f"\n{thinking_result['answer']}")
+                #                     
+                #                     # 更新对话历史
+                #                     final_thinking_answer = thinking_result['answer']
+                #                     self.messages[-1] = {"role": "assistant", "content": final_content + "\n\n" + final_thinking_answer}
+                #                     self.save_log(u, final_content + "\n\n" + final_thinking_answer)
+                #                     
+                #                     # GRAG记忆存储（开发者模式不写入）
+                #                     if self.memory_manager and not self.dev_mode:
+                #                         try:
+                #                             await self.memory_manager.add_conversation_memory(u, final_content + "\n\n" + final_thinking_answer)
+                #                         except Exception as e:
+                #                             logger.error(f"GRAG记忆存储失败: {e}")
+                #             except Exception as e:
+                #                 logger.error(f"深度思考处理失败: {e}")
+                #                 yield ("娜迦", f"🌳 深度思考系统出错: {str(e)}")
+                #     except asyncio.TimeoutError:
+                #         # 超时取消任务
+                #         thinking_task.cancel()
+                #     except Exception as e:
+                #         logger.debug(f"思考判断任务异常: {e}")
                 
             except Exception as e:
                 print(f"工具调用循环失败: {e}")
@@ -528,33 +570,33 @@ class NagaConversation: # 对话主类
             logger.error(f"API调用失败: {e}")
             return f"API调用出错: {str(e)}"
 
-    async def _async_thinking_judgment(self, question: str) -> bool:
-        """异步判断问题是否需要深度思考
+    # async def _async_thinking_judgment(self, question: str) -> bool:
+    #     """异步判断问题是否需要深度思考
         
-        Args:
-            question: 用户问题
+    #     Args:
+    #         question: 用户问题
             
-        Returns:
-            bool: 是否需要深度思考
-        """
-        try:
-            if not self.tree_thinking:
-                return False
+    #     Returns:
+    #         bool: 是否需要深度思考
+    #     """
+    #     try:
+    #         if not self.tree_thinking:
+    #             return False
             
-            # 使用thinking文件夹中现成的难度判断器
-            difficulty_assessment = await self.tree_thinking.difficulty_judge.assess_difficulty(question)
-            difficulty = difficulty_assessment.get("difficulty", 3)
+    #         # 使用thinking文件夹中现成的难度判断器
+    #         difficulty_assessment = await self.tree_thinking.difficulty_judge.assess_difficulty(question)
+    #         difficulty = difficulty_assessment.get("difficulty", 3)
             
-            # 根据难度判断是否需要深度思考
-            # 难度4-5（复杂/极难）建议深度思考
-            should_think_deeply = difficulty >= 4
+    #         # 根据难度判断是否需要深度思考
+    #         # 难度4-5（复杂/极难）建议深度思考
+    #         should_think_deeply = difficulty >= 4
             
-            logger.info(f"难度判断：{difficulty}/5，建议深度思考：{should_think_deeply}")
-            return should_think_deeply
+    #         logger.info(f"难度判断：{difficulty}/5，建议深度思考：{should_think_deeply}")
+    #         return should_think_deeply
                    
-        except Exception as e:
-            logger.debug(f"异步思考判断失败: {e}")
-            return False
+    #     except Exception as e:
+    #         logger.debug(f"异步思考判断失败: {e}")
+    #         return False
 
 async def process_user_message(s,msg):
     if config.system.voice_enabled and not msg: #无文本输入时启动语音识别

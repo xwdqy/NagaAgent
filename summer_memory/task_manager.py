@@ -106,7 +106,6 @@ class QuintupleTaskManager:
                     name=f"task_worker_{i}"
                 )
                 self.worker_tasks.append(worker_task)
-                logger.info(f"创建工作协程: {worker_task.get_name()} (状态: {worker_task.done()})")
 
             # 添加工作协程状态检查
             await asyncio.sleep(0.5)  # 短暂等待协程启动

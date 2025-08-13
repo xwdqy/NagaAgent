@@ -6,22 +6,52 @@ from config import config  # 全局配置 #
 
 
 class NagaPortalClient:
-    """与官网API交互的轻量客户端(基础骨架) #"""
+    """与官网API交互的轻量客户端(长期缓存优化版) #"""
 
     def __init__(self, base_url: Optional[str] = None):  # 初始化 #
         self.base_url = (base_url or config.naga_portal.portal_url).rstrip('/')  # 基础URL #
         self._client: Optional[httpx.AsyncClient] = None  # 异步客户端 #
         self._logged_in: bool = False  # 登录标记 #
         self._username_masked: str = ""  # 掩码用户名 #
+        self._cached_user_id: Optional[int] = None  # 缓存的用户ID #
+        self._user_id_initialized: bool = False  # 用户ID是否已初始化 #
+        
+        # 项目启动时初始化用户ID缓存 #
+        self._init_user_id_cache()  # 初始化用户ID缓存 #
+
+    def _init_user_id_cache(self):  # 初始化用户ID缓存 #
+        """项目启动时获取并缓存用户ID #"""
+        try:
+            from .portal_login_manager import get_user_id
+            self._cached_user_id = get_user_id()
+            self._user_id_initialized = True
+            # 静默处理，不打印调试信息 #
+        except Exception as e:
+            # 如果获取失败，不影响正常使用
+            pass
 
     async def _ensure_client(self):  # 确保客户端 #
         if self._client is None:  # 未创建则创建 #
+            # 优化超时时间，从15秒降低到8秒 #
+            timeout = min(config.naga_portal.request_timeout, 8)  # 最大8秒超时 #
             self._client = httpx.AsyncClient(
                 base_url=self.base_url,
-                timeout=config.naga_portal.request_timeout,  # 统一超时 #
+                timeout=timeout,  # 优化超时 #
                 follow_redirects=True,
                 headers=config.naga_portal.default_headers.copy(),  # 默认头 #
+                limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),  # 连接池优化 #
             )  # 创建客户端 #
+            
+            # 设置最新的cookie到新客户端 #
+            try:
+                from .portal_login_manager import get_cookies
+                latest_cookies = get_cookies()
+                if latest_cookies:
+                    self._client.cookies.update(latest_cookies)  # 设置最新cookie #
+            except Exception as e:
+                # 如果获取cookie失败，尝试使用保存的cookie #
+                if hasattr(self, '_saved_cookies') and self._saved_cookies:
+                    self._client.cookies.update(self._saved_cookies)  # 重新设置cookie #
 
     @staticmethod
     def _mask(s: str) -> str:  # 掩码 #
@@ -73,7 +103,7 @@ class NagaPortalClient:
             # 检查是否有set-cookie头 #
             if "set-cookie" in resp.headers:
                 response_data["cookies_set"] = True  # 标记有cookie #
-                response_data["cookie_count"] = len(resp.headers.getlist("set-cookie"))  # cookie数量 #
+                response_data["cookie_count"] = len(resp.headers.get_list("set-cookie"))  # cookie数量 #
             
             return {"success": ok, "status": "ok" if ok else "http_error", "message": f"HTTP {resp.status_code}", "data": response_data}  # 返回 #
         except Exception as e:
@@ -85,8 +115,20 @@ class NagaPortalClient:
         await self._ensure_client()  # 确保客户端 #
         if not path.startswith('/'):
             path = '/' + path  # 规范路径 #
+        
+        # 获取最新的cookie并直接传递给请求 #
+        cookies = {}
         try:
-            resp = await self._client.get(path, params=params or {}, headers=headers)  # 发送 #
+            from .portal_login_manager import get_cookies
+            cookies = get_cookies()  # 获取最新cookie #
+        except Exception as e:
+            # 如果获取cookie失败，使用保存的cookie #
+            if hasattr(self, '_saved_cookies'):
+                cookies = self._saved_cookies or {}
+        
+        try:
+            # 直接传递cookies参数到GET请求 #
+            resp = await self._client.get(path, params=params or {}, headers=headers, cookies=cookies)  # 发送 #
             return {"success": True, "status": "ok", "message": f"HTTP {resp.status_code}", "data": {"status_code": resp.status_code, "text": resp.text[:1000]}}  # 返回 #
         except Exception as e:
             return {"success": False, "status": "network_error", "message": str(e), "data": {}}  # 异常 #
@@ -95,49 +137,121 @@ class NagaPortalClient:
         await self._ensure_client()  # 确保客户端 #
         if not path.startswith('/'):
             path = '/' + path  # 规范路径 #
+        
+        # 获取最新的cookie并直接传递给请求 #
+        cookies = {}
         try:
-            resp = await self._client.post(path, json=json_body or {}, headers=headers)  # 发送 #
+            from .portal_login_manager import get_cookies
+            cookies = get_cookies()  # 获取最新cookie #
+        except Exception as e:
+            # 如果获取cookie失败，使用保存的cookie #
+            if hasattr(self, '_saved_cookies'):
+                cookies = self._saved_cookies or {}
+        
+        try:
+            # 直接传递cookies参数到POST请求 #
+            resp = await self._client.post(path, json=json_body or {}, headers=headers, cookies=cookies)  # 发送 #
             return {"success": True, "status": "ok", "message": f"HTTP {resp.status_code}", "data": {"status_code": resp.status_code, "text": resp.text[:1000]}}  # 返回 #
         except Exception as e:
             return {"success": False, "status": "network_error", "message": str(e), "data": {}}  # 异常 #
 
-    async def request(self, method: str, path: str, *, params: Optional[Dict[str, Any]] = None, json_body: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:  # 通用请求 #
-        await self._ensure_client()  # 准备 #
-        if not path.startswith('/'):
-            path = '/' + path  # 规范 #
-        tries = max(1, config.naga_portal.retry_times + 1)  # 尝试次数 #
-        last_exc = None  # 最后异常 #
-        for _ in range(tries):  # 重试循环 #
-            try:
-                resp = await self._client.request(method.upper(), path, params=params, json=json_body, headers=headers)  # 请求 #
-                return {"success": True, "status": "ok", "message": f"HTTP {resp.status_code}", "data": {"status_code": resp.status_code, "text": resp.text[:2000]}}  # 返回 #
-            except Exception as e:
-                last_exc = e  # 保存异常 #
-        return {"success": False, "status": "network_error", "message": str(last_exc), "data": {}}  # 重试后失败 #
-
-    def set_bearer_token(self, token: str):  # 设置Bearer令牌 #
-        if self._client:
-            self._client.headers["authorization"] = f"Bearer {token}"  # 设置头 #
-
-    def set_headers(self, headers: Dict[str, str]):  # 批量设置头 #
-        if self._client:
-            self._client.headers.update(headers or {})  # 更新 #
-
     def set_cookies(self, cookies: Dict[str, str]):  # 批量设置cookie #
+        """设置客户端cookie，用于保持登录状态 #"""
+        # 保存cookie到实例变量，确保_ensure_client时能重新设置
+        self._saved_cookies = cookies or {}  # 保存cookie #
         if self._client:
-            self._client.cookies.update(cookies or {})  # 更新 #
+            self._client.cookies.update(self._saved_cookies)  # 更新cookie #
 
-    async def get_profile(self) -> Dict[str, Any]:  # 获取用户信息(占位) #
-        # 约定测试路径 /api/profile，如不同后续再改 #
-        return await self.get('/api/profile')  # 代理 #
+    def get_cached_user_id(self) -> Optional[int]:  # 获取缓存的用户ID #
+        """获取项目启动时缓存的用户ID #"""
+        return self._cached_user_id
 
-    async def logout(self) -> Dict[str, Any]:  # 登出 #
+    async def recharge(self, amount: str, payment_type: str = "wxpay") -> Dict[str, Any]:  # 额度充值(长期缓存版) #
+        """发起额度充值请求 #"""
+        await self._ensure_client()  # 确保客户端 #
+        # 构建充值请求载荷 #
+        payload = {
+            "amount": float(amount),  # 金额（数字格式） #
+            "paymentMethod": payment_type,  # 支付方式 #
+            "package": None  # 包信息 #
+        }  # 载荷 #
+        
         try:
-            if self._client:
-                await self._client.aclose()  # 关闭 #
-        finally:
-            self._client = None  # 清理 #
-            self._logged_in = False  # 状态 #
-        return {"success": True, "status": "ok", "message": "已清理本地会话", "data": {"user": self._username_masked}}  # 返回 #
+            # 使用项目启动时缓存的用户ID #
+            headers = {}
+            user_id = self.get_cached_user_id()
+            if user_id:
+                headers["user-id"] = str(user_id)  # 修正header名称 #
+            
+            # 调试信息：显示当前cookie状态 #
+            try:
+                from .portal_login_manager import get_cookies
+                current_cookies = get_cookies()
+                print(f"🍪 当前Cookie信息: {current_cookies}")
+            except Exception as e:
+                print(f"🍪 获取Cookie失败: {e}")
+            
+            resp = await self.post("/api/user/pay", json_body=payload, headers=headers)  # 发送充值请求 #
+            
+            # 处理响应 #
+            if resp.get("success"):
+                response_data = resp.get("data", {})
+                response_text = response_data.get("text", "")
+                
+                # 解析响应JSON #
+                try:
+                    import json
+                    response_json = json.loads(response_text)
+                    
+                    # 获取支付URL #
+                    payment_url = response_json.get("url", "")
+                    if payment_url:
+                        return {
+                            "success": True,
+                            "status": "payment_ready",
+                            "message": f"充值请求成功，请访问支付页面完成支付",
+                            "data": {
+                                "payment_url": payment_url,
+                                "amount": amount,
+                                "payment_type": payment_type,
+                                "original_response": response_json
+                            }
+                        }  # 返回支付信息 #
+                    else:
+                        # 没有支付URL，返回原始响应 #
+                        return {
+                            "success": True,
+                            "status": "request_sent",
+                            "message": "充值请求已发送，请检查响应内容",
+                            "data": {
+                                "amount": amount,
+                                "payment_type": payment_type,
+                                "response": response_json
+                            }
+                        }  # 返回请求信息 #
+                except json.JSONDecodeError:
+                    # JSON解析失败，返回原始响应 #
+                    return {
+                        "success": True,
+                        "status": "request_sent",
+                        "message": "充值请求已发送，请检查响应内容",
+                        "data": {
+                            "amount": amount,
+                            "payment_type": payment_type,
+                            "response": response_data
+                        }
+                    }  # 返回请求信息 #
+            else:
+                # 请求失败 #
+                return resp  # 返回原始错误响应 #
+                
+        except Exception as e:
+            return {"success": False, "status": "network_error", "message": str(e), "data": {}}  # 异常 #
+
+    async def close(self):  # 关闭客户端 #
+        """关闭HTTP客户端，释放资源 #"""
+        if self._client:
+            await self._client.aclose()  # 关闭客户端 #
+            self._client = None  # 清空引用 #
 
 
