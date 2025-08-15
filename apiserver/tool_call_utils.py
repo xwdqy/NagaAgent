@@ -15,11 +15,18 @@ logger = logging.getLogger("ToolCallUtils")
 def parse_tool_calls(content: str) -> list:
     """解析JSON格式工具调用，支持MCP和Agent两种类型"""
     tool_calls = []
-    pattern = r'｛([\s\S]*?)｝'
+    # 支持中英文括号的正则表达式
+    pattern = r'[｛{]([\s\S]*?)[｝}]'
     matches = re.finditer(pattern, content)
     for match in matches:
         try:
+            # 将中文括号替换为英文括号
             json_content = "{" + match.group(1).strip() + "}"
+            
+            # 处理尾随逗号问题
+            # 移除对象末尾的尾随逗号
+            json_content = re.sub(r',(\s*[}\]])', r'\1', json_content)
+            
             tool_args = json.loads(json_content)
             
             agent_type = tool_args.get('agentType', 'mcp').lower()
@@ -147,9 +154,17 @@ async def tool_call_loop(messages: List[Dict], mcp_manager, llm_caller, is_strea
                 print(f"[DEBUG] 工具调用{i+1}: {tool_call}")
             
             tool_results = await execute_tool_calls(tool_calls, mcp_manager)
-            current_messages.append({'role': 'assistant', 'content': current_ai_content})
-            current_messages.append({'role': 'user', 'content': tool_results})
-            recursion_depth += 1
+            
+            # 检查工具结果是否包含成功信息，如果成功则直接返回结果
+            if "成功" in tool_results or "success" in tool_results.lower():
+                # 工具调用成功，直接返回结果，不再进行递归
+                current_ai_content = tool_results
+                break
+            else:
+                # 工具调用失败或需要进一步处理，继续递归
+                current_messages.append({'role': 'assistant', 'content': current_ai_content})
+                current_messages.append({'role': 'user', 'content': tool_results})
+                recursion_depth += 1
         except Exception as e:
             print(f"工具调用循环错误: {e}")
             break
