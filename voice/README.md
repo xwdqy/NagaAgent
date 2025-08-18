@@ -11,7 +11,10 @@
 - **可选直接指定edge-tts语音**：既可用OpenAI语音映射，也可直接指定任意edge-tts语音
 - **HTTP和WebSocket双模式**：支持REST API和实时WebSocket连接
 - **统一配置管理**：与NagaAgent主系统配置完全集成
-- **后台直接播放**：使用pygame库进行内存中直接播放，无需创建临时文件
+- **流式TTS播放**：参考MoeChat的标点符号分割算法，支持实时音频合成和播放
+- **智能分句**：基于标点符号的智能句子分割，避免播放过长音频片段
+- **工具调用分流**：支持工具调用的特殊处理，不影响普通文本的语音播放
+- **内存播放**：使用pygame库进行内存中直接播放，无需创建临时文件
 
 ![GitHub stars](https://img.shields.io/github/stars/travisvn/openai-edge-tts?style=social)
 ![GitHub forks](https://img.shields.io/github/forks/travisvn/openai-edge-tts?style=social)
@@ -124,10 +127,13 @@ curl -X POST http://127.0.0.1:5050/v1/audio/speech \
 
 ### 音频播放方式
 
-#### pygame后台直接播放
+#### 流式TTS播放（参考MoeChat）
+- **标点符号分割**：参考MoeChat的标点符号分割算法，实时检测句子结束
+- **括号计数**：智能处理嵌套括号，避免错误分割工具调用
 - **内存播放**：使用pygame库直接在内存中播放音频数据，无需创建临时文件
 - **并发支持**：支持多个音频片段排队播放，避免重叠
 - **智能分句**：自动将长文本分割成合适长度的句子进行播放
+- **工具调用分流**：支持工具调用的特殊处理，不影响普通文本的语音播放
 - **高效播放**：直接播放内存中的音频数据，性能更优
 
 ### 用法
