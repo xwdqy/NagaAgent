@@ -49,7 +49,25 @@ class SpeechInputManager:
             "language": "zh-CN",
             "confidence_threshold": 0.7,
             "timeout": 30,
-            "continuous": True
+            "continuous": True,
+            "use_ui": False,  # 是否使用默认UI
+            "auto_stop_silence_timeout": 3  # 自动停止静音超时
+        }
+        
+        # 约束配置
+        self.constraints_config = {
+            "dictation": True,  # 听写约束
+            "web_search": False,  # 网络搜索约束
+            "list_constraints": [],  # 列表约束
+            "grammar_file": None  # SRGS语法文件
+        }
+        
+        # UI选项配置
+        self.ui_options_config = {
+            "audible_prompt": "请说话...",  # 音频提示
+            "example_text": "例如：'今天天气怎么样'",  # 示例文本
+            "is_readback_enabled": True,  # 是否启用回读
+            "show_confirmation": True  # 是否显示确认
         }
         
         # 从配置文件加载设置
@@ -67,6 +85,9 @@ class SpeechInputManager:
             if self.windows_speech.is_available():
                 self.current_provider = self.windows_speech
                 logger.info("Windows Speech输入初始化成功")
+                
+                # 应用配置到提供者
+                self._apply_config_to_provider()
                 return
         except Exception as e:
             logger.warning(f"Windows Speech输入初始化失败: {e}")
@@ -79,8 +100,41 @@ class SpeechInputManager:
             if hasattr(config, 'speech_input'):
                 self.speech_config.update(config.speech_input)
                 logger.info("语音输入配置加载成功")
+            
+            # 加载约束配置
+            if hasattr(config, 'speech_constraints'):
+                self.constraints_config.update(config.speech_constraints)
+                logger.info("语音约束配置加载成功")
+            
+            # 加载UI选项配置
+            if hasattr(config, 'speech_ui_options'):
+                self.ui_options_config.update(config.speech_ui_options)
+                logger.info("语音UI选项配置加载成功")
+                
         except Exception as e:
             logger.warning(f"加载语音输入配置失败: {e}")
+    
+    def _apply_config_to_provider(self):
+        """将配置应用到当前提供者"""
+        if not self.current_provider:
+            return
+        
+        try:
+            # 应用UI选项
+            self.current_provider.set_ui_options(self.ui_options_config)
+            
+            # 应用约束配置
+            if self.constraints_config["web_search"]:
+                self.current_provider.set_web_search_enabled(True)
+            
+            # 应用列表约束
+            for constraint_name, word_list in self.constraints_config["list_constraints"]:
+                self.current_provider.add_list_constraint(constraint_name, word_list)
+            
+            logger.info("配置已应用到语音提供者")
+            
+        except Exception as e:
+            logger.error(f"应用配置到提供者失败: {e}")
     
     def start_listening(self, on_text: Callable[[str], None] = None,
                        on_error: Callable[[str], None] = None,
@@ -102,7 +156,8 @@ class SpeechInputManager:
         # 开始监听
         success = self.current_provider.start_listening(
             self._on_text_received,
-            self._on_error_received
+            self._on_error_received,
+            self._on_status_changed
         )
         
         if success:
@@ -123,6 +178,19 @@ class SpeechInputManager:
         self.is_listening = False
         self._notify_status_change()
         logger.info("语音监听已停止")
+    
+    def recognize_with_ui(self, on_text: Callable[[str], None] = None,
+                         on_error: Callable[[str], None] = None) -> Optional[str]:
+        """使用默认UI进行单次识别"""
+        if not self.current_provider:
+            logger.error("没有可用的语音输入提供者")
+            return None
+        
+        try:
+            return self.current_provider.recognize_with_ui(on_text, on_error)
+        except Exception as e:
+            logger.error(f"UI识别失败: {e}")
+            return None
     
     def _on_text_received(self, text: str):
         """处理接收到的文本"""
@@ -147,6 +215,17 @@ class SpeechInputManager:
             except Exception as e:
                 logger.error(f"处理语音错误时出错: {e}")
     
+    def _on_status_changed(self, status_data: Dict[str, Any]):
+        """处理状态变化"""
+        logger.debug(f"语音状态变化: {status_data}")
+        
+        # 调用用户回调函数
+        if self.on_status_changed:
+            try:
+                self.on_status_changed(status_data)
+            except Exception as e:
+                logger.error(f"处理状态变化时出错: {e}")
+    
     def _notify_status_change(self):
         """通知状态变化"""
         if self.on_status_changed:
@@ -162,7 +241,10 @@ class SpeechInputManager:
             "listening": self.is_listening,
             "enabled": self.speech_config["enabled"],
             "provider": None,
-            "available_providers": []
+            "available_providers": [],
+            "config": self.speech_config.copy(),
+            "constraints": self.constraints_config.copy(),
+            "ui_options": self.ui_options_config.copy()
         }
         
         if self.current_provider:
@@ -183,6 +265,7 @@ class SpeechInputManager:
             if self.is_listening:
                 self.stop_listening()
             self.current_provider = self.windows_speech
+            self._apply_config_to_provider()
             logger.info("切换到Windows Speech提供者")
             return True
         
@@ -203,6 +286,59 @@ class SpeechInputManager:
         
         return False
     
+    def add_list_constraint(self, constraint_name: str, word_list: List[str]) -> bool:
+        """添加列表约束"""
+        try:
+            # 添加到配置
+            self.constraints_config["list_constraints"].append((constraint_name, word_list))
+            
+            # 应用到当前提供者
+            if self.current_provider and hasattr(self.current_provider, 'add_list_constraint'):
+                success = self.current_provider.add_list_constraint(constraint_name, word_list)
+                if success:
+                    logger.info(f"添加列表约束: {constraint_name}")
+                return success
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"添加列表约束失败: {e}")
+            return False
+    
+    def set_web_search_enabled(self, enabled: bool) -> bool:
+        """设置网络搜索约束"""
+        try:
+            self.constraints_config["web_search"] = enabled
+            
+            if self.current_provider and hasattr(self.current_provider, 'set_web_search_enabled'):
+                success = self.current_provider.set_web_search_enabled(enabled)
+                if success:
+                    logger.info(f"网络搜索约束: {'启用' if enabled else '禁用'}")
+                return success
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"设置网络搜索约束失败: {e}")
+            return False
+    
+    def set_ui_options(self, options: Dict[str, Any]) -> bool:
+        """设置UI选项"""
+        try:
+            self.ui_options_config.update(options)
+            
+            if self.current_provider and hasattr(self.current_provider, 'set_ui_options'):
+                success = self.current_provider.set_ui_options(options)
+                if success:
+                    logger.info("UI选项已更新")
+                return success
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"设置UI选项失败: {e}")
+            return False
+    
     def get_supported_languages(self) -> List[str]:
         """获取支持的语言列表"""
         try:
@@ -220,11 +356,26 @@ class SpeechInputManager:
     
     def get_config(self) -> Dict[str, Any]:
         """获取配置"""
-        return self.speech_config.copy()
+        return {
+            "speech_config": self.speech_config.copy(),
+            "constraints_config": self.constraints_config.copy(),
+            "ui_options_config": self.ui_options_config.copy()
+        }
     
     def update_config(self, new_config: Dict[str, Any]):
         """更新配置"""
-        self.speech_config.update(new_config)
+        if "speech_config" in new_config:
+            self.speech_config.update(new_config["speech_config"])
+        
+        if "constraints_config" in new_config:
+            self.constraints_config.update(new_config["constraints_config"])
+        
+        if "ui_options_config" in new_config:
+            self.ui_options_config.update(new_config["ui_options_config"])
+        
+        # 应用新配置到提供者
+        self._apply_config_to_provider()
+        
         logger.info("语音输入配置已更新")
 
 # 全局语音输入管理器实例
@@ -250,10 +401,31 @@ def stop_speech_listening():
     manager = get_speech_input_manager()
     manager.stop_listening()
 
+def recognize_with_ui(on_text: Callable[[str], None] = None,
+                     on_error: Callable[[str], None] = None) -> Optional[str]:
+    """使用默认UI进行单次识别"""
+    manager = get_speech_input_manager()
+    return manager.recognize_with_ui(on_text, on_error)
+
 def get_speech_status() -> Dict[str, Any]:
     """获取语音输入状态"""
     manager = get_speech_input_manager()
     return manager.get_status()
+
+def add_list_constraint(constraint_name: str, word_list: List[str]) -> bool:
+    """添加列表约束"""
+    manager = get_speech_input_manager()
+    return manager.add_list_constraint(constraint_name, word_list)
+
+def set_web_search_enabled(enabled: bool) -> bool:
+    """设置网络搜索约束"""
+    manager = get_speech_input_manager()
+    return manager.set_web_search_enabled(enabled)
+
+def set_ui_options(options: Dict[str, Any]) -> bool:
+    """设置UI选项"""
+    manager = get_speech_input_manager()
+    return manager.set_ui_options(options)
 
 # 使用示例
 if __name__ == "__main__":
@@ -273,6 +445,15 @@ if __name__ == "__main__":
     if manager.is_available():
         print("语音输入可用")
         print(f"当前状态: {manager.get_status()}")
+        
+        # 设置UI选项
+        manager.set_ui_options({
+            "audible_prompt": "请说话进行测试...",
+            "example_text": "例如：'你好'、'今天天气怎么样'"
+        })
+        
+        # 添加列表约束
+        manager.add_list_constraint("commands", ["开始", "停止", "退出"])
         
         # 开始监听
         if manager.start_listening(on_text_received, on_error_received, on_status_changed):
