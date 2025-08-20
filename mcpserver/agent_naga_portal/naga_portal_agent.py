@@ -434,6 +434,7 @@ class NagaPortalAgent:
                     "success": True,
                     "status": "balance_success",
                     "message": f"余额查询成功，当前余额：{round(remaining_balance, 2)}元",
+                    "data": {}
                 }  # 返回余额信息 #
             else:
                 # 查询失败 #

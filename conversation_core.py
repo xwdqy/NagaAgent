@@ -14,7 +14,7 @@ from typing import List, Dict
 from openai import OpenAI, AsyncOpenAI
 
 # 本地模块导入
-from apiserver.tool_call_utils import parse_tool_calls, execute_tool_calls, tool_call_loop
+from apiserver.tool_call_utils import tool_call_loop
 from config import config
 from mcpserver.mcp_manager import get_mcp_manager
 from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
@@ -312,13 +312,13 @@ class NagaConversation: # 对话主类
                 'status': 'error'
             }
 
-    # 工具调用循环相关方法
-    def handle_llm_response(self, a, mcp):
-        # 只保留普通文本流式输出逻辑 #
-        async def text_stream():
-            for line in a.splitlines():
-                yield ("娜迦", line)
-        return text_stream()
+    # 工具调用循环相关方法 - 已废弃，使用流式工具调用提取器替代
+    # def handle_llm_response(self, a, mcp):
+    #     # 只保留普通文本流式输出逻辑 #
+    #     async def text_stream():
+    #         for line in a.splitlines():
+    #             yield ("娜迦", line)
+    #     return text_stream()
 
     def _format_services_for_prompt(self, available_services: dict) -> str:
         """格式化可用服务列表为prompt字符串，MCP服务和Agent服务分开，包含具体调用格式"""
@@ -475,10 +475,14 @@ class NagaConversation: # 对话主类
             #     import asyncio
             #     thinking_task = asyncio.create_task(self._async_thinking_judgment(u))
             
-            # 流式处理：实时检测工具调用
+            # 流式处理：实时检测工具调用，使用统一的工具调用循环
             try:
                 # 导入流式工具调用提取器
                 from apiserver.streaming_tool_extractor import StreamingToolCallExtractor
+                import queue
+                
+                # 创建工具调用队列
+                tool_calls_queue = queue.Queue()
                 tool_extractor = StreamingToolCallExtractor(self.mcp)
                 
                 # 用于累积前端显示的纯文本（不包含工具调用）
@@ -518,7 +522,8 @@ class NagaConversation: # 对话主类
                     on_text_chunk=on_text_chunk,
                     on_sentence=on_sentence,
                     on_tool_call=on_tool_call,
-                    on_tool_result=on_tool_result
+                    on_tool_result=on_tool_result,
+                    tool_calls_queue=tool_calls_queue
                 )
                 
                 # 调用LLM API - 流式模式
@@ -552,7 +557,64 @@ class NagaConversation: # 对话主类
                         elif isinstance(result, str):
                             yield ("娜迦", result)
                 
+                # 检查是否有工具调用需要处理
+                if not tool_calls_queue.empty():
+                    # 使用统一的工具调用循环处理
+                    async def llm_caller(messages, use_stream=False):
+                        """LLM调用函数，用于工具调用循环"""
+                        # 这里不需要实际调用LLM，因为工具调用已经提取完成
+                        return {'content': '', 'status': 'success'}
+                    
+                    # 使用工具调用循环处理工具调用
+                    result = await tool_call_loop(msgs, self.mcp, llm_caller, is_streaming=True, tool_calls_queue=tool_calls_queue)
+                    
+                    if result.get('has_tool_results'):
+                        # 有工具执行结果，让LLM继续处理
+                        tool_results = result['content']
+                        
+                        # 构建包含工具结果的消息
+                        tool_messages = self.messages.copy()
+                        tool_messages.append({"role": "user", "content": f"工具执行结果：{tool_results}"})
+                        
+                        # 调用LLM继续处理工具结果
+                        try:
+                            resp2 = await self.async_client.chat.completions.create(
+                                model=config.api.model,
+                                messages=tool_messages,
+                                temperature=config.api.temperature,
+                                max_tokens=config.api.max_tokens,
+                                stream=True
+                            )
+                            
+                            # 处理LLM的继续响应 - 也需要通过流式工具调用提取器处理
+                            async for chunk in resp2:
+                                if chunk.choices[0].delta.content:
+                                    content = chunk.choices[0].delta.content
+                                    # 使用流式工具调用提取器处理内容
+                                    results = await tool_extractor.process_text_chunk(content)
+                                    if results:
+                                        for result in results:
+                                            if isinstance(result, tuple) and len(result) == 2:
+                                                yield result
+                                            elif isinstance(result, str):
+                                                yield ("娜迦", result)
+                                    
+                                    # 注意：文本内容通过 on_text_chunk 回调函数已经累积到 display_text 中
+                        except Exception as e:
+                            print(f"LLM继续处理工具结果失败: {e}")
+                
+                # 完成所有处理，获取最终的纯文本内容
+                final_results = await tool_extractor.finish_processing()
+                if final_results:
+                    for result in final_results:
+                        if isinstance(result, tuple) and len(result) == 2:
+                            yield result
+                        elif isinstance(result, str):
+                            yield ("娜迦", result)
+                
                 # 保存对话历史（使用前端显示的纯文本）
+                print(f"[DEBUG] 最终display_text长度: {len(display_text)}")
+                print(f"[DEBUG] 最终display_text内容: {display_text[:200]}...")
                 self.messages += [{"role": "user", "content": u}, {"role": "assistant", "content": display_text}]
                 self.save_log(u, display_text)
                 

@@ -14,11 +14,11 @@ Author: Naga搜索模块
 Version: 1.0.0
 """
 
-from .bocha_search_agent import BochaSearchAgent, create_bocha_search_agent
+from .online_search_agent import OnlineSearchAgent, create_online_search_agent
 
 __all__ = [
-    'BochaSearchAgent',
-    'create_bocha_search_agent'
+    'OnlineSearchAgent',
+    'create_online_search_agent'
 ]
 
 __version__ = '1.0.0'

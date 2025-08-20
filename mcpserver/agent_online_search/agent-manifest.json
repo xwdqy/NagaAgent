@@ -1,16 +1,16 @@
 {
   "name": "BochaSearchAgent",
-  "displayName": "博查搜索Agent",
+  "displayName": "博查搜索",
   "version": "1.0.0",
-  "description": "调用博查搜索API，返回全网最新相关实时信息",
   "author": "Naga",
   "agentType": "mcp",
+  "description": "调用博查API进行网页搜索，返回相关实时信息",
   "entryPoint": {
-    "module": "mcpserver.agent_bocha_search.bocha_search_agent",
-    "class": "BochaSearchAgent"
+    "module": "mcpserver.agent_online_search.online_search_agent",
+    "class": "OnlineSearchAgent",
+    "function": "create_online_search_agent"
   },
   "factory": {
-    "create_instance": "create_bocha_search_agent",
     "validate_config": "validate_agent_config",
     "get_dependencies": "get_agent_dependencies"
   },
@@ -22,7 +22,7 @@
     "invocationCommands": [
       {
         "command": "search",
-        "description": "执行博查搜索。\n- `tool_name`: 固定为 `search`\n- `query`: 搜索内容（必需）\n**调用示例:**\n```json\n{\"tool_name\": \"search\", \"query\": \"天空为什么是蓝色的？\"}```",
+        "description": "执行网页搜索",
         "example": "{\"tool_name\": \"search\", \"query\": \"天空为什么是蓝色的？\"}"
       }
     ]

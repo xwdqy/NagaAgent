@@ -40,6 +40,9 @@ class VoiceIntegration:
         self.min_sentence_length = 5  # 最小句子长度
         self.max_concurrent_tasks = 3  # 最大并发任务数
         
+        # 并发控制
+        self.tts_semaphore = threading.Semaphore(2)  # 限制TTS请求并发数为2
+        
         # 音频文件存储目录
         self.audio_temp_dir = Path("logs/audio_temp")
         self.audio_temp_dir.mkdir(parents=True, exist_ok=True)
@@ -198,6 +201,11 @@ class VoiceIntegration:
 
     def _generate_audio_sync(self, text: str) -> Optional[bytes]:
         """同步生成音频数据"""
+        # 使用信号量控制并发
+        if not self.tts_semaphore.acquire(timeout=10):  # 10秒超时
+            logger.warning("TTS请求超时，跳过音频生成")
+            return None
+            
         try:
             # 文本预处理
             if not getattr(config.tts, 'remove_filter', False):
@@ -238,6 +246,9 @@ class VoiceIntegration:
         except Exception as e:
             logger.error(f"生成音频数据异常: {e}")
             return None
+        finally:
+            # 释放信号量
+            self.tts_semaphore.release()
 
     def _audio_player_worker(self):
         """音频播放工作线程"""

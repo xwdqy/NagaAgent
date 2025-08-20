@@ -469,8 +469,8 @@ class ChatWindow(QWidget):
         }
         
         # 添加消息到UI - 用户名和内容之间只有一个换行，消息之间不需要额外间隔
-        s.text.append(f"<span style='color:#fff;font-size:12pt;font-family:Lucida Console;'>{name}</span><br>")
-        s.text.append(f"<span style='color:#fff;font-size:16pt;font-family:Lucida Console;'>{content_html}</span><br>")
+        s.text.append(f"<span style='color:#fff;font-size:12pt;font-family:Lucida Console;'>{name}</span>")
+        s.text.append(f"<span style='color:#fff;font-size:16pt;font-family:Lucida Console;'>{content_html}</span>")
         
         # 滚动到底部
         s.text.verticalScrollBar().setValue(s.text.verticalScrollBar().maximum())
@@ -508,8 +508,8 @@ class ChatWindow(QWidget):
                 content = message_info['content']
                 
                 # 添加消息到UI - 用户名和内容之间只有一个换行，消息之间不需要额外间隔
-                self.text.append(f"<span style='color:#fff;font-size:12pt;font-family:Lucida Console;'>{name}</span><br>")
-                self.text.append(f"<span style='color:#fff;font-size:16pt;font-family:Lucida Console;'>{content}</span><br>")
+                self.text.append(f"<span style='color:#fff;font-size:12pt;font-family:Lucida Console;'>{name}</span>")
+                self.text.append(f"<span style='color:#fff;font-size:16pt;font-family:Lucida Console;'>{content}</span>")
         
         # 滚动到底部
         self.text.verticalScrollBar().setValue(self.text.verticalScrollBar().maximum())

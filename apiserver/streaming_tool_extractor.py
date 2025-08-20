@@ -34,18 +34,23 @@ class StreamingToolCallExtractor:
         # 语音集成（可选）
         self.voice_integration = None
         
+        # 工具调用队列（用于与工具调用循环通信）
+        self.tool_calls_queue = None
+        
     def set_callbacks(self, 
                      on_text_chunk: Optional[Callable] = None,
                      on_sentence: Optional[Callable] = None,
                      on_tool_call: Optional[Callable] = None,
                      on_tool_result: Optional[Callable] = None,
-                     voice_integration=None):
+                     voice_integration=None,
+                     tool_calls_queue=None):
         """设置回调函数"""
         self.on_text_chunk = on_text_chunk
         self.on_sentence = on_sentence
         self.on_tool_call = on_tool_call
         self.on_tool_result = on_tool_result
         self.voice_integration = voice_integration
+        self.tool_calls_queue = tool_calls_queue
     
     async def process_text_chunk(self, text_chunk: str):
         """处理文本块，分离普通文本和工具调用"""
@@ -82,8 +87,8 @@ class StreamingToolCallExtractor:
                         self.tool_call_buffer = ""
                         self.is_in_tool_call = False
                         
-                        # 处理工具调用
-                        result = await self._process_tool_call(tool_call)
+                        # 处理工具调用 - 只提取，不执行
+                        result = await self._extract_tool_call(tool_call)
                         if result:
                             results.append(result)
                         
@@ -183,8 +188,8 @@ class StreamingToolCallExtractor:
     
 
     
-    async def _process_tool_call(self, tool_call_text: str):
-        """处理工具调用"""
+    async def _extract_tool_call(self, tool_call_text: str):
+        """提取工具调用 - 不执行，只提取到队列"""
         try:
             logger.info(f"检测到工具调用: {tool_call_text[:100]}...")
             
@@ -209,49 +214,20 @@ class StreamingToolCallExtractor:
             if tool_calls:
                 logger.info(f"解析到 {len(tool_calls)} 个工具调用")
                 
-                # 执行工具调用
-                if self.mcp_manager:
-                    results = await execute_tool_calls(tool_calls, self.mcp_manager)
-                    
-                    # 发送工具结果回调
-                    if self.on_tool_result:
-                        try:
-                            # 尝试异步调用
-                            if asyncio.iscoroutinefunction(self.on_tool_result):
-                                result = await self.on_tool_result(results, "tool_result")
-                            else:
-                                # 同步调用
-                                result = self.on_tool_result(results, "tool_result")
-                            
-                            if result:
-                                return result
-                        except Exception as e:
-                            logger.error(f"工具结果回调错误: {e}")
-                    
-                    logger.info(f"工具调用执行完成: {results[:100]}...")
-                else:
-                    logger.warning("MCP管理器未设置，跳过工具调用执行")
+                # 将工具调用添加到队列，供工具调用循环处理
+                if self.tool_calls_queue:
+                    for tool_call in tool_calls:
+                        self.tool_calls_queue.put(tool_call)
+                    logger.info(f"已将 {len(tool_calls)} 个工具调用添加到队列")
+                
+                # 返回工具调用检测提示 - 使用HTML格式与普通消息保持一致
+                return ("娜迦", f"<span style='color:#888;font-size:14pt;font-family:Lucida Console;'>🔧 检测到工具调用，正在执行...</span>")
             else:
                 logger.warning("工具调用解析失败")
                 
         except Exception as e:
-            error_msg = f"工具调用处理失败: {str(e)}"
+            error_msg = f"工具调用提取失败: {str(e)}"
             logger.error(error_msg)
-            
-            # 发送错误回调
-            if self.on_tool_result:
-                try:
-                    # 尝试异步调用
-                    if asyncio.iscoroutinefunction(self.on_tool_result):
-                        result = await self.on_tool_result(error_msg, "tool_error")
-                    else:
-                        # 同步调用
-                        result = self.on_tool_result(error_msg, "tool_error")
-                    
-                    if result:
-                        return result
-                except Exception as e:
-                    logger.error(f"工具错误回调错误: {e}")
         
         return None
     
