@@ -19,7 +19,8 @@ class NagaPortalAgent:
     async def handle_handoff(self, data: dict) -> str:  # 统一入口 #
         tool = data.get("tool_name")  # 工具名 #
         try:
-            if tool == "naga_recharge":
+            # 支持新旧工具名兼容
+            if tool in ["naga_recharge", "充值"]:
                 amount = data.get("amount")  # 充值金额 #
                 payment_type = data.get("payment_type", "wxpay")  # 支付方式，默认微信支付 #
                 if not amount:
@@ -33,7 +34,7 @@ class NagaPortalAgent:
                 result = await self._simple_recharge(amount, payment_type)  # 充值 #
                 return json.dumps(result, ensure_ascii=False)  # 返回 #
 
-            elif tool == "naga_redeem_code":
+            elif tool in ["naga_redeem_code", "兑换码"]:
                 key = data.get("key")  # 兑换码 #
                 if not key:
                     return json.dumps({"success": False, "status": "invalid_args", "message": "缺少key参数", "data": {}}, ensure_ascii=False)  # 校验 #
@@ -42,12 +43,12 @@ class NagaPortalAgent:
                 result = await self._simple_redeem_code(key)  # 兑换码 #
                 return json.dumps(result, ensure_ascii=False)  # 返回 #
 
-            elif tool == "naga_balance":
+            elif tool in ["naga_balance", "查询余额"]:
                 # 直接使用httpx进行API调用 #
                 result = await self._simple_balance()  # 余额查询 #
                 return json.dumps(result, ensure_ascii=False)  # 返回 #
 
-            elif tool == "naga_apply_token":
+            elif tool in ["naga_apply_token", "申请令牌"]:
                 name = data.get("name")  # 令牌名称 #
                 group = data.get("group")  # 模型组 #
                 unlimited_quota = data.get("unlimited_quota", True)  # 是否无限制额度 #
@@ -56,7 +57,7 @@ class NagaPortalAgent:
                 result = await self._smart_apply_api_token(name, group, unlimited_quota)  # 智能申请 #
                 return json.dumps(result, ensure_ascii=False)  # 返回 #
 
-            elif tool == "naga_get_tokens":
+            elif tool in ["naga_get_tokens", "查看令牌"]:
                 # 获取已配置的API令牌列表 #
                 result = await self._get_api_tokens()  # 获取令牌列表 #
                 return json.dumps(result, ensure_ascii=False)  # 返回 #

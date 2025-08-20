@@ -121,7 +121,7 @@ class OnlineSearchAgent:
         try:
             tool_name = data.get("tool_name", "").lower()
             
-            if tool_name == "search":
+            if tool_name == "网页搜索":
                 query = data.get("query")
                 if not query:
                     return json.dumps({
@@ -149,7 +149,7 @@ class OnlineSearchAgent:
             else:
                 return json.dumps({
                     "status": "error",
-                    "message": f"不支持的操作: {tool_name}，支持的操作：search",
+                    "message": f"不支持的操作: {tool_name}，支持的操作：网页搜索",
                     "data": {}
                 }, ensure_ascii=False)
                 

@@ -225,6 +225,9 @@ if config.api_server.enabled and config.api_server.auto_start:
 
 service_manager.start_tts_server()
 
+# MQTT连接已在后台异步执行，连接完成后会自动显示状态
+print("⏳ MQTT正在后台初始化连接...")
+
 # NagaPortal自动登录已在后台异步执行，登录完成后会自动显示状态
 print("⏳ NagaPortal正在后台自动登录...")
 show_help()

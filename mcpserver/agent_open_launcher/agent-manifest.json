@@ -1,9 +1,9 @@
 {
-  "name": "AppLauncherAgent",
-  "displayName": "智能应用启动Agent（综合版）",
+  "name": "应用启动服务",
+  "displayName": "应用启动服务",
   "version": "2.2.0",
-  "description": "支持从Windows注册表和快捷方式扫描应用并启动：智能获取应用列表并启动指定应用，优先使用快捷方式启动。",
-  "author": "Naga应用操作模块",
+  "description": "智能获取应用列表并启动指定应用",
+  "author": "NagaAgent",
   "agentType": "mcp",
   "entryPoint": {
     "module": "mcpserver.agent_open_launcher.agent_app_launcher",
@@ -21,16 +21,16 @@
   "capabilities": {
     "invocationCommands": [
       {
-        "command": "open",
-        "description": "智能应用启动工具。\n- `tool_name`: 固定为 `open`\n- `app`: 应用名称（可选，如果不提供则返回应用列表）\n- `args`: 启动参数（可选）\n**使用方式1 - 获取应用列表:**\n```json\n{\"tool_name\": \"open\"}```\n**使用方式2 - 启动指定应用:**\n```json\n{\"tool_name\": \"open\", \"app\": \"notepad\"}```\n**注意:** 如果不提供app参数，会返回可用应用列表供选择；如果提供app参数，会尝试启动指定应用。支持注册表和快捷方式两种来源，优先使用快捷方式启动。",
-        "example": "{\"tool_name\": \"open\", \"app\": \"notepad\"}"
+        "command": "启动应用",
+        "description": "智能应用启动工具；参数：app（应用名称，可选，不提供则返回应用列表）、args（启动参数，可选）",
+        "example": "{\"tool_name\":\"启动应用\",\"app\":\"notepad\"}"
       }
     ]
   },
   "inputSchema": {
     "type": "object",
     "properties": {
-      "tool_name": {"type": "string", "description": "工具名称：open"},
+      "tool_name": {"type": "string", "description": "工具名称：启动应用"},
       "app": {"type": "string", "description": "应用名称（可选，不提供则返回应用列表）"},
       "args": {"type": "string", "description": "启动参数（可选）"}
     },

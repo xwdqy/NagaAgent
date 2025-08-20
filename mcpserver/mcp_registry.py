@@ -70,7 +70,6 @@ def scan_and_register_mcp_agents(mcp_dir: str = 'mcpserver') -> list:
                 if agent_instance:
                     MCP_REGISTRY[agent_name] = agent_instance
                     registered_agents.append(agent_name)
-                    sys.stderr.write(f"✅ 已注册MCP Agent: {agent_name}\n")
                     
             elif agent_type == 'agent':
                 # Agent类型：转交给AgentManager处理

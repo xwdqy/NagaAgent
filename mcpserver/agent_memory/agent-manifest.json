@@ -1,9 +1,9 @@
 {
-  "name": "MemoryAgent",
-  "displayName": "记忆五元组Agent",
+  "name": "心智云图",
+  "displayName": "心智云图",
   "version": "1.0.0",
   "description": "支持五元组知识图谱的回忆与查询。",
-  "author": "Naga记忆模块",
+  "author": "NagaAgent",
   "agentType": "mcp",
   "entryPoint": {
     "module": "mcpserver.agent_memory.agent_memory",
@@ -19,16 +19,16 @@
   "capabilities": {
     "invocationCommands": [
       {
-        "command": "recall",
-        "description": "根据用户问题查询知识图谱五元组，返回相关记忆内容。\n- `tool_name`: 固定为 `recall`\n- `query`: 查询内容（必需）\n**调用示例:**\n```json\n{\"tool_name\": \"recall\", \"query\": \"西藏的雪山\"}\n```",
-        "example": "{\"tool_name\": \"recall\", \"query\": \"西藏的雪山\"}"
+        "command": "回忆",
+        "description": "根据用户问题查询知识图谱五元组，返回相关记忆内容；参数：query（查询内容，必需）",
+        "example": "{\"tool_name\":\"回忆\",\"query\":\"西藏的雪山\"}"
       }
     ]
   },
   "inputSchema": {
     "type": "object",
     "properties": {
-      "tool_name": {"type": "string", "description": "工具名称：recall"},
+      "tool_name": {"type": "string", "description": "工具名称：回忆"},
       "query": {"type": "string", "description": "查询内容（必需）"}
     },
     "required": ["tool_name", "query"]

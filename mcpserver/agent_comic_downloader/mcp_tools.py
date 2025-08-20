@@ -145,8 +145,8 @@ mcp_tools = MCPTools()
 
 # 工具函数映射
 TOOLS = {
-    'download_comic': {
-        'name': 'download_comic',
+    '下载漫画': {
+        'name': '下载漫画',
         'description': '下载指定ID的漫画到桌面',
         'parameters': {
             'type': 'object',
@@ -159,8 +159,8 @@ TOOLS = {
             'required': ['album_id']
         }
     },
-    'get_download_status': {
-        'name': 'get_download_status',
+    '查询下载状态': {
+        'name': '查询下载状态',
         'description': '获取指定漫画的下载状态',
         'parameters': {
             'type': 'object',
@@ -173,8 +173,8 @@ TOOLS = {
             'required': ['album_id']
         }
     },
-    'cancel_download': {
-        'name': 'cancel_download',
+    '取消下载': {
+        'name': '取消下载',
         'description': '取消指定漫画的下载任务',
         'parameters': {
             'type': 'object',
@@ -187,8 +187,8 @@ TOOLS = {
             'required': ['album_id']
         }
     },
-    'get_all_status': {
-        'name': 'get_all_status',
+    '查询所有状态': {
+        'name': '查询所有状态',
         'description': '获取所有下载任务的状态',
         'parameters': {
             'type': 'object',
@@ -218,13 +218,13 @@ def call_tool(tool_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         工具执行结果
     """
     try:
-        if tool_name == 'download_comic':
+        if tool_name == '下载漫画':
             return mcp_tools.download_comic(parameters['album_id'])
-        elif tool_name == 'get_download_status':
+        elif tool_name == '查询下载状态':
             return mcp_tools.get_download_status(parameters['album_id'])
-        elif tool_name == 'cancel_download':
+        elif tool_name == '取消下载':
             return mcp_tools.cancel_download(parameters['album_id'])
-        elif tool_name == 'get_all_status':
+        elif tool_name == '查询所有状态':
             return mcp_tools.get_all_status()
         else:
             return {

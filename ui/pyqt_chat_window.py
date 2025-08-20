@@ -468,9 +468,17 @@ class ChatWindow(QWidget):
             'position': len(s.text.toPlainText())
         }
         
-        # 添加消息到UI - 用户名和内容之间只有一个换行，消息之间不需要额外间隔
-        s.text.append(f"<span style='color:#fff;font-size:12pt;font-family:Lucida Console;'>{name}</span>")
-        s.text.append(f"<span style='color:#fff;font-size:16pt;font-family:Lucida Console;'>{content_html}</span>")
+        # 使用insertHtml避免append的自动换行，手动控制间距
+        cursor = s.text.textCursor()
+        cursor.movePosition(cursor.End)
+        
+        # 添加用户名
+        cursor.insertHtml(f"<span style='color:#fff;font-size:12pt;font-family:Lucida Console;'>{name}</span>")
+        cursor.insertHtml("<br>")  # 用户名和内容之间的换行
+        
+        # 添加内容
+        cursor.insertHtml(f"<span style='color:#fff;font-size:16pt;font-family:Lucida Console;'>{content_html}</span>")
+        cursor.insertHtml("<br><br>")  # 消息之间的间隔
         
         # 滚动到底部
         s.text.verticalScrollBar().setValue(s.text.verticalScrollBar().maximum())
@@ -507,9 +515,17 @@ class ChatWindow(QWidget):
                 name = message_info['name']
                 content = message_info['content']
                 
-                # 添加消息到UI - 用户名和内容之间只有一个换行，消息之间不需要额外间隔
-                self.text.append(f"<span style='color:#fff;font-size:12pt;font-family:Lucida Console;'>{name}</span>")
-                self.text.append(f"<span style='color:#fff;font-size:16pt;font-family:Lucida Console;'>{content}</span>")
+                # 使用insertHtml避免append的自动换行，手动控制间距
+                cursor = self.text.textCursor()
+                cursor.movePosition(cursor.End)
+                
+                # 添加用户名
+                cursor.insertHtml(f"<span style='color:#fff;font-size:12pt;font-family:Lucida Console;'>{name}</span>")
+                cursor.insertHtml("<br>")  # 用户名和内容之间的换行
+                
+                # 添加内容
+                cursor.insertHtml(f"<span style='color:#fff;font-size:16pt;font-family:Lucida Console;'>{content}</span>")
+                cursor.insertHtml("<br><br>")  # 消息之间的间隔
         
         # 滚动到底部
         self.text.verticalScrollBar().setValue(self.text.verticalScrollBar().maximum())

@@ -34,7 +34,7 @@ class SystemControlAgent(Agent):
         if not action:
             return json.dumps({"status": "error", "message": "缺少tool_name参数", "data": {}}, ensure_ascii=False)
             
-        if action == "shutdown":
+        if action == "定时关机":
             time_sec = int(data.get("time", 0))
             import keyboard
             import threading
@@ -75,7 +75,7 @@ class SystemControlAgent(Agent):
                 return json.dumps({"status": "success", "message": f"关机已确认，{time_sec}秒后关机", "data": {}}, ensure_ascii=False)
             else:
                 return json.dumps({"status": "cancelled", "message": "关机已取消", "data": {}}, ensure_ascii=False)
-        elif action == "restart":
+        elif action == "定时重启":
             time_sec = int(data.get("time", 0))
             import keyboard
             import threading
@@ -116,14 +116,14 @@ class SystemControlAgent(Agent):
                 return json.dumps({"status": "success", "message": f"重启已确认，{time_sec}秒后重启", "data": {}}, ensure_ascii=False)
             else:
                 return json.dumps({"status": "cancelled", "message": "重启已取消", "data": {}}, ensure_ascii=False)
-        elif action == "set_brightness":
+        elif action == "设置亮度":
             value = int(data.get("value", 50))
             if sbc:
                 sbc.set_brightness(value)
                 return json.dumps({"status": "success", "message": f"亮度已设置为{value}", "data": {"brightness": value}}, ensure_ascii=False)
             else:
                 return json.dumps({"status": "error", "message": "未安装screen_brightness_control库，无法调节亮度", "data": {}}, ensure_ascii=False)
-        elif action == "set_volume":
+        elif action == "设置音量":
             value = int(data.get("value", 50))
             if AudioUtilities:
                 try:

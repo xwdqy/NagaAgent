@@ -137,6 +137,9 @@ class NagaConversation: # 对话主类
             
             # 异步启动NagaPortal自动登录
             self._start_naga_portal_auto_login()
+            
+            # 异步启动MQTT连接状态检查
+            self._start_mqtt_status_check()
         except Exception as e:
             logger.error(f"MCP服务系统初始化失败: {e}")
     
@@ -229,6 +232,50 @@ class NagaConversation: # 对话主类
                     
         except Exception as e:
             print(f"🍪 NagaPortal状态获取失败: {e}")
+    
+    def _start_mqtt_status_check(self):
+        """启动MQTT连接并显示状态（异步）"""
+        try:
+            # 检查是否配置了MQTT
+            if not config.mqtt.enabled:
+                return  # 静默跳过，不输出日志
+            
+            # 在新线程中异步执行MQTT连接
+            def run_mqtt_connection():
+                try:
+                    import sys
+                    import os
+                    import time
+                    # 添加项目根目录到Python路径
+                    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    sys.path.insert(0, project_root)
+                    
+                    try:
+                        from mqtt_tool.device_switch import device_manager
+                        
+                        # 尝试连接MQTT
+                        if hasattr(device_manager, 'connect'):
+                            success = device_manager.connect()
+                            if success:
+                                print("🔗 MQTT连接状态: 已连接")
+                            else:
+                                print("⚠️ MQTT连接状态: 连接失败（将在使用时重试）")
+                        else:
+                            print("❌ MQTT功能不可用")
+                            
+                    except Exception as e:
+                        print(f"⚠️ MQTT连接失败: {e}")
+                        
+                except Exception as e:
+                    print(f"❌ MQTT连接异常: {e}")
+            
+            # 启动后台线程
+            import threading
+            mqtt_thread = threading.Thread(target=run_mqtt_connection, daemon=True)
+            mqtt_thread.start()
+            
+        except Exception as e:
+            print(f"❌ MQTT连接启动失败: {e}")
     
     def save_log(self, u, a):  # 保存对话日志
         if self.dev_mode:

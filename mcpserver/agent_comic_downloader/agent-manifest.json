@@ -1,9 +1,9 @@
 {
-  "name": "ComicDownloaderAgent",
-  "displayName": "漫画下载Agent",
+  "name": "漫画下载服务",
+  "displayName": "漫画下载服务",
   "version": "1.0.0",
   "description": "支持漫画下载功能，默认保存到桌面，支持异步下载和状态查询。",
-  "author": "Naga下载模块",
+  "author": "NagaAgent",
   "agentType": "mcp",
   "entryPoint": {
     "module": "mcpserver.agent_comic_downloader.comic_downloader_agent",
@@ -21,32 +21,32 @@
   "capabilities": {
     "invocationCommands": [
       {
-        "command": "download_comic",
-        "description": "下载指定ID的漫画到桌面。\n- `tool_name`: 固定为 `download_comic`\n- `album_id`: 漫画ID（必需）\n**调用示例:**\n```json\n{\"tool_name\": \"download_comic\", \"album_id\": \"422866\"}```",
-        "example": "{\"tool_name\": \"download_comic\", \"album_id\": \"422866\"}"
+        "command": "下载漫画",
+        "description": "下载指定ID的漫画到桌面；参数：album_id（漫画ID，必需）",
+        "example": "{\"tool_name\":\"下载漫画\",\"album_id\":\"422866\"}"
       },
       {
-        "command": "get_download_status",
-        "description": "获取指定漫画的下载状态。\n- `tool_name`: 固定为 `get_download_status`\n- `album_id`: 漫画ID（必需）\n**调用示例:**\n```json\n{\"tool_name\": \"get_download_status\", \"album_id\": \"422866\"}```",
-        "example": "{\"tool_name\": \"get_download_status\", \"album_id\": \"422866\"}"
+        "command": "查询下载状态",
+        "description": "获取指定漫画的下载状态；参数：album_id（漫画ID，必需）",
+        "example": "{\"tool_name\":\"查询下载状态\",\"album_id\":\"422866\"}"
       },
       {
-        "command": "cancel_download",
-        "description": "取消指定漫画的下载任务。\n- `tool_name`: 固定为 `cancel_download`\n- `album_id`: 漫画ID（必需）\n**调用示例:**\n```json\n{\"tool_name\": \"cancel_download\", \"album_id\": \"422866\"}```",
-        "example": "{\"tool_name\": \"cancel_download\", \"album_id\": \"422866\"}"
+        "command": "取消下载",
+        "description": "取消指定漫画的下载任务；参数：album_id（漫画ID，必需）",
+        "example": "{\"tool_name\":\"取消下载\",\"album_id\":\"422866\"}"
       },
       {
-        "command": "get_all_status",
-        "description": "获取所有下载任务的状态。\n- `tool_name`: 固定为 `get_all_status`\n**调用示例:**\n```json\n{\"tool_name\": \"get_all_status\"}```",
-        "example": "{\"tool_name\": \"get_all_status\"}"
+        "command": "查询所有状态",
+        "description": "获取所有下载任务的状态；无需参数",
+        "example": "{\"tool_name\":\"查询所有状态\"}"
       }
     ]
   },
   "inputSchema": {
     "type": "object",
     "properties": {
-      "tool_name": {"type": "string", "description": "工具名称：download_comic/get_download_status/cancel_download/get_all_status"},
-      "album_id": {"type": "string", "description": "漫画ID（download_comic/get_download_status/cancel_download时必需）"}
+      "tool_name": {"type": "string", "description": "工具名称：下载漫画/查询下载状态/取消下载/查询所有状态"},
+      "album_id": {"type": "string", "description": "漫画ID（下载漫画/查询下载状态/取消下载时必需）"}
     },
     "required": ["tool_name"]
   },

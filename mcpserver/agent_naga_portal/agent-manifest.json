@@ -1,8 +1,8 @@
 {
-  "name": "NagaPortalAgent",
-  "displayName": "娜迦官网API Agent",
+  "name": "娜迦充值服务",
+  "displayName": "娜迦充值服务",
   "version": "0.1.0",
-  "description": "与娜迦官网API进行交互的MCP服务（充值功能）",
+  "description": "娜迦API官网交互功能",
   "author": "NagaAgent",
   "agentType": "mcp",
   "entryPoint": {
@@ -21,29 +21,29 @@
   "capabilities": {
     "invocationCommands": [
       {
-        "command": "naga_recharge",
-        "description": "额度充值；参数：amount（必填，充值金额）、payment_type（可选，支付方式，默认wxpay，支持wxpay/alipay）",
-        "example": "{\"tool_name\":\"naga_recharge\",\"amount\":\"11.00\",\"payment_type\":\"wxpay\"}"
+        "command": "充值",
+        "description": "为账户充值；参数：amount（必填，充值金额）、payment_type（可选，支付方式，默认wxpay，支持wxpay/alipay）",
+        "example": "{\"tool_name\":\"充值\",\"amount\":\"11.00\",\"payment_type\":\"wxpay\"}"
       },
       {
-        "command": "naga_redeem_code",
-        "description": "兑换码使用；参数：key（必填，兑换码）",
-        "example": "{\"tool_name\":\"naga_redeem_code\",\"key\":\"aaaa\"}"
+        "command": "兑换码",
+        "description": "使用兑换码充值；参数：key（必填，兑换码）",
+        "example": "{\"tool_name\":\"兑换码\",\"key\":\"aaaa\"}"
       },
       {
-        "command": "naga_balance",
-        "description": "余额查询；无需参数",
-        "example": "{\"tool_name\":\"naga_balance\"}"
+        "command": "查询余额",
+        "description": "查询账户余额；无需参数",
+        "example": "{\"tool_name\":\"查询余额\"}"
       },
       {
-        "command": "naga_apply_token",
-        "description": "智能申请API令牌；参数：name（可选，令牌名称）、group（可选，模型组）、unlimited_quota（可选，是否无限制额度，默认true）。如果不提供参数，会返回可用模型列表供选择",
-        "example": "{\"tool_name\":\"naga_apply_token\"}"
+        "command": "申请令牌",
+        "description": "申请API令牌；参数：name（可选，令牌名称）、group（可选，模型组）、unlimited_quota（可选，是否无限制额度，默认true）。如果不提供参数，会返回可用模型列表供选择",
+        "example": "{\"tool_name\":\"申请令牌\"}"
       },
       {
-        "command": "naga_get_tokens",
-        "description": "获取已配置的API令牌列表；无需参数",
-        "example": "{\"tool_name\":\"naga_get_tokens\"}"
+        "command": "查看令牌",
+        "description": "查看已配置的API令牌列表；无需参数",
+        "example": "{\"tool_name\":\"查看令牌\"}"
       }
     ]
   },

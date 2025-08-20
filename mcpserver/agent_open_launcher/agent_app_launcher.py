@@ -30,7 +30,7 @@ class AppLauncherAgent(object):
             if not tool_name:
                 return json.dumps({"success": False, "status": "error", "message": "缺少tool_name参数", "data": {}}, ensure_ascii=False)
             
-            if tool_name == "open":
+            if tool_name == "启动应用":
                 # 智能应用启动工具 #
                 app = data.get("app")
                 args = data.get("args")

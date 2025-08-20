@@ -21,7 +21,7 @@ class MemoryAgent(Agent):
 
     async def handle_handoff(self, data: dict) -> str:
         tool_name = data.get("tool_name")
-        if tool_name != "recall":
+        if tool_name != "回忆":
             return json.dumps({
                 "status": "error",
                 "message": f"未知操作: {tool_name}",

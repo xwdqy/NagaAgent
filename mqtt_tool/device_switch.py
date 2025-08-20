@@ -54,7 +54,7 @@ def load_mqtt_config():
                 'broker': mqtt_config.get('broker', 'broker.emqx.io'),
                 'port': mqtt_config.get('port', 1883),
                 'topic': mqtt_config.get('topic', 'device/switch'),
-                'client_id': mqtt_config.get('client_id', 'mcp_device_switch'),
+                'client_id': mqtt_config.get('client_id', 'mcp_mqtt_tool'),
                 'username': mqtt_config.get('username', ''),
                 'password': mqtt_config.get('password', '')
             }
@@ -112,6 +112,36 @@ class DeviceSwitchManager:
         # 设置用户名密码（如果有）
         if mqtt_config['username'] or mqtt_config['password']:
             self.client.username_pw_set(mqtt_config['username'], mqtt_config['password'])
+        
+        # 初始化时自动连接MQTT（如果配置完整）
+        self._init_connection()
+
+    def _init_connection(self):
+        """初始化时自动连接MQTT"""
+        try:
+            # 检查MQTT配置是否完整
+            if not mqtt_config:
+                logger.warning("MQTT配置缺失，跳过初始化连接")
+                return
+            
+            # 检查必要的配置项
+            required_configs = ['broker', 'port', 'topic', 'client_id']
+            missing_configs = [config for config in required_configs if not mqtt_config.get(config)]
+            
+            if missing_configs:
+                logger.warning(f"MQTT配置不完整，缺少: {missing_configs}，跳过初始化连接")
+                return
+            
+            logger.info("MQTT配置完整，开始初始化连接...")
+            
+            # 尝试连接
+            if self.connect():
+                logger.info("✅ MQTT初始化连接成功")
+            else:
+                logger.warning("⚠️ MQTT初始化连接失败，将在使用时重试")
+                
+        except Exception as e:
+            logger.error(f"MQTT初始化连接异常: {e}")
 
     def _on_connect(self, client, userdata, flags, rc, properties=None, *args):
         if rc == 0:
@@ -247,8 +277,13 @@ class DeviceSwitchManager:
             return False, "MQTT功能不可用"
             
         with self._lock:
-            if not self.connect():
-                return False, "MQTT未连接"
+            # 检查是否已连接，如果未连接则尝试连接（保底方案）
+            if not self.connected:
+                logger.info("MQTT未连接，尝试连接...")
+                if not self.connect():
+                    return False, "MQTT连接失败"
+            else:
+                logger.debug("MQTT已连接，跳过连接步骤")
             
             try:
                 payload = {
