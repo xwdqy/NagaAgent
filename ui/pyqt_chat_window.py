@@ -1,16 +1,17 @@
 import sys, os; sys.path.insert(0, os.path.abspath(os.path.dirname(__file__) + '/..'))
 from .styles.button_factory import ButtonFactory
 import sys, datetime
-from PyQt5.QtWidgets import QApplication, QWidget, QTextEdit, QSizePolicy, QGraphicsBlurEffect, QHBoxLayout, QLabel, QVBoxLayout, QStackedLayout, QPushButton, QStackedWidget, QDesktopWidget, QScrollArea, QSplitter, QGraphicsDropShadowEffect, QFileDialog, QMessageBox
+from PyQt5.QtWidgets import QApplication, QWidget, QTextEdit, QSizePolicy, QGraphicsBlurEffect, QHBoxLayout, QLabel, QVBoxLayout, QStackedLayout, QPushButton, QStackedWidget, QDesktopWidget, QScrollArea, QSplitter, QGraphicsDropShadowEffect, QFileDialog, QMessageBox, QFrame
 from PyQt5.QtCore import Qt, QRect, QThread, pyqtSignal, QParallelAnimationGroup, QPropertyAnimation, QEasingCurve, QTimer
 from PyQt5.QtGui import QColor, QPainter, QBrush, QFont, QPixmap, QPalette, QPen, QIcon
 from conversation_core import NagaConversation
 import os
 from config import config # 导入统一配置
 from ui.response_utils import extract_message  # 新增：引入消息提取工具
-from ui.progress_widget import EnhancedProgressWidget  # 导入进度组件
+from ui.styles.progress_widget import EnhancedProgressWidget  # 导入进度组件
 from ui.enhanced_worker import StreamingWorker, BatchWorker  # 导入增强Worker
 from ui.elegant_settings_widget import ElegantSettingsWidget
+from ui.message_renderer import MessageRenderer  # 导入消息渲染器
 import asyncio
 import json
 import threading
@@ -29,6 +30,8 @@ MAC_BTN_SIZE = config.ui.mac_btn_size
 MAC_BTN_MARGIN = config.ui.mac_btn_margin
 MAC_BTN_GAP = config.ui.mac_btn_gap
 ANIMATION_DURATION = config.ui.animation_duration
+
+
 
 class TitleBar(QWidget):
     def __init__(s, text, parent=None):
@@ -210,19 +213,63 @@ class ChatWindow(QWidget):
                 border: none;
             }
         """) # 保证背景穿透
-        s.text = QTextEdit() # 聊天历史
-        s.text.setReadOnly(True)
-        s.text.setStyleSheet(f"""
-            QTextEdit {{
-                background: rgba(17,17,17,{int(BG_ALPHA*255)});
-                color: #fff;
-                border-radius: 15px;
-                border: 1px solid rgba(255, 255, 255, 50);
-                font: 16pt 'Lucida Console';
-                padding: 10px;
-            }}
+        
+        # 创建聊天页面容器
+        s.chat_page = QWidget()
+        s.chat_page.setStyleSheet("""
+            QWidget {
+                background: transparent;
+                border: none;
+            }
         """)
-        s.chat_stack.addWidget(s.text) # index 0 聊天页
+        
+        # 创建滚动区域来容纳消息对话框
+        s.chat_scroll_area = QScrollArea(s.chat_page)
+        s.chat_scroll_area.setWidgetResizable(True)
+        s.chat_scroll_area.setStyleSheet("""
+            QScrollArea {
+                background: transparent;
+                border: none;
+                outline: none;
+            }
+            QScrollBar:vertical {
+                background: rgba(255, 255, 255, 30);
+                width: 8px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(255, 255, 255, 80);
+                border-radius: 4px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: rgba(255, 255, 255, 120);
+            }
+        """)
+        
+        # 创建滚动内容容器
+        s.chat_content = QWidget()
+        s.chat_content.setStyleSheet("""
+            QWidget {
+                background: transparent;
+                border: none;
+            }
+        """)
+        
+        # 创建垂直布局来排列消息对话框
+        s.chat_layout = QVBoxLayout(s.chat_content)
+        s.chat_layout.setContentsMargins(10, 10, 10, 10)
+        s.chat_layout.setSpacing(10)
+        s.chat_layout.addStretch()  # 添加弹性空间，让消息从顶部开始
+        
+        s.chat_scroll_area.setWidget(s.chat_content)
+        
+        # 创建聊天页面布局
+        chat_page_layout = QVBoxLayout(s.chat_page)
+        chat_page_layout.setContentsMargins(0, 0, 0, 0)
+        chat_page_layout.addWidget(s.chat_scroll_area)
+        
+        s.chat_stack.addWidget(s.chat_page) # index 0 聊天页
         s.settings_page = s.create_settings_page() # index 1 设置页
         s.chat_stack.addWidget(s.settings_page)
         vlay.addWidget(s.chat_stack, 1)
@@ -465,23 +512,24 @@ class ChatWindow(QWidget):
             'name': name,
             'content': content_html,
             'full_content': content,
-            'position': len(s.text.toPlainText())
+            'dialog_widget': None
         }
         
-        # 使用insertHtml避免append的自动换行，手动控制间距
-        cursor = s.text.textCursor()
-        cursor.movePosition(cursor.End)
+        # 使用消息渲染器创建对话框
+        if name == "系统":
+            message_dialog = MessageRenderer.create_system_message(name, content_html, s.chat_content)
+        else:
+            message_dialog = MessageRenderer.create_user_message(name, content_html, s.chat_content)
         
-        # 添加用户名
-        cursor.insertHtml(f"<span style='color:#fff;font-size:12pt;font-family:Lucida Console;'>{name}</span>")
-        cursor.insertHtml("<br>")  # 用户名和内容之间的换行
+        # 存储对话框引用
+        s._messages[message_id]['dialog_widget'] = message_dialog
         
-        # 添加内容
-        cursor.insertHtml(f"<span style='color:#fff;font-size:16pt;font-family:Lucida Console;'>{content_html}</span>")
-        cursor.insertHtml("<br><br>")  # 消息之间的间隔
+        # 在弹性空间之前插入新的消息对话框
+        stretch_index = s.chat_layout.count() - 1
+        s.chat_layout.insertWidget(stretch_index, message_dialog)
         
         # 滚动到底部
-        s.text.verticalScrollBar().setValue(s.text.verticalScrollBar().maximum())
+        s.scroll_to_bottom()
         
         return message_id
     
@@ -497,38 +545,37 @@ class ChatWindow(QWidget):
             if hasattr(s, '_messages') and s._current_message_id in s._messages:
                 s._messages[s._current_message_id]['content'] = content_html
                 s._messages[s._current_message_id]['full_content'] = content
-            
-            # 重新构建整个聊天界面
-            s._rebuild_chat_display()
+                
+                # 使用消息渲染器更新对话框内容
+                dialog_widget = s._messages[s._current_message_id]['dialog_widget']
+                if dialog_widget:
+                    MessageRenderer.update_message_content(dialog_widget, content_html)
         else:
             # 如果没有当前消息ID，直接添加新消息
             s.add_user_message(name, content)
     
-    def _rebuild_chat_display(self):
-        """重新构建聊天显示"""
-        # 清空当前显示
-        self.text.clear()
+    def scroll_to_bottom(s):
+        """滚动到聊天区域底部"""
+        # 使用QTimer延迟滚动，确保布局完成
+        QTimer.singleShot(10, lambda: s.chat_scroll_area.verticalScrollBar().setValue(
+            s.chat_scroll_area.verticalScrollBar().maximum()
+        ))
         
-        # 重新添加所有消息
-        if hasattr(self, '_messages'):
-            for message_id, message_info in self._messages.items():
-                name = message_info['name']
-                content = message_info['content']
-                
-                # 使用insertHtml避免append的自动换行，手动控制间距
-                cursor = self.text.textCursor()
-                cursor.movePosition(cursor.End)
-                
-                # 添加用户名
-                cursor.insertHtml(f"<span style='color:#fff;font-size:12pt;font-family:Lucida Console;'>{name}</span>")
-                cursor.insertHtml("<br>")  # 用户名和内容之间的换行
-                
-                # 添加内容
-                cursor.insertHtml(f"<span style='color:#fff;font-size:16pt;font-family:Lucida Console;'>{content}</span>")
-                cursor.insertHtml("<br><br>")  # 消息之间的间隔
+    def clear_chat_history(s):
+        """清除聊天历史记录"""
+        # 清除所有消息对话框
+        if hasattr(s, '_messages'):
+            for message_id, message_info in s._messages.items():
+                dialog_widget = message_info.get('dialog_widget')
+                if dialog_widget:
+                    dialog_widget.deleteLater()
+            s._messages.clear()
         
-        # 滚动到底部
-        self.text.verticalScrollBar().setValue(self.text.verticalScrollBar().maximum())
+        # 清除布局中的所有widget（除了弹性空间）
+        while s.chat_layout.count() > 1:  # 保留最后的弹性空间
+            item = s.chat_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
     def on_send(s):
         u = s.input.toPlainText().strip()
         if u:
@@ -597,7 +644,7 @@ class ChatWindow(QWidget):
             s.update_last_message("娜迦", s.current_response)
             
         # 强制UI更新
-        s.text.repaint()
+        s.chat_scroll_area.viewport().update()
     
     def finalize_streaming_response(s):
         """完成流式响应 - 立即处理"""
@@ -644,13 +691,71 @@ class ChatWindow(QWidget):
     
     def handle_tool_call(s, notification):
         """处理工具调用通知"""
-        # 在状态栏显示工具调用状态
+        # 创建专门的工具调用内容对话框（没有用户名）
+        tool_call_dialog = MessageRenderer.create_tool_call_content_message(notification, s.chat_content)
+        
+        # 设置嵌套对话框内容
+        nested_title = "工具调用详情"
+        nested_content = f"""
+工具名称: {notification}
+状态: 正在执行...
+时间: {time.strftime('%H:%M:%S')}
+        """.strip()
+        tool_call_dialog.set_nested_content(nested_title, nested_content)
+        
+        # 生成消息ID
+        if not hasattr(s, '_message_counter'):
+            s._message_counter = 0
+        s._message_counter += 1
+        message_id = f"tool_call_{s._message_counter}"
+        
+        # 初始化消息存储
+        if not hasattr(s, '_messages'):
+            s._messages = {}
+        
+        # 存储工具调用消息信息
+        s._messages[message_id] = {
+            'name': '工具调用',
+            'content': notification,
+            'full_content': notification,
+            'dialog_widget': tool_call_dialog
+        }
+        
+        # 在弹性空间之前插入工具调用对话框
+        stretch_index = s.chat_layout.count() - 1
+        s.chat_layout.insertWidget(stretch_index, tool_call_dialog)
+        
+        # 滚动到底部
+        s.scroll_to_bottom()
+        
+        # 在状态栏也显示工具调用状态
         s.progress_widget.status_label.setText(f"🔧 {notification}")
         print(f"工具调用: {notification}")
     
     def handle_tool_result(s, result):
         """处理工具执行结果"""
-        # 在状态栏显示工具执行结果
+        # 查找最近的工具调用对话框并更新
+        if hasattr(s, '_messages'):
+            for message_id, message_info in reversed(list(s._messages.items())):
+                if message_id.startswith('tool_call_'):
+                    dialog_widget = message_info.get('dialog_widget')
+                    if dialog_widget:
+                        # 更新工具调用对话框显示结果
+                        MessageRenderer.update_message_content(dialog_widget, f"✅ {result}")
+                        
+                        # 更新嵌套对话框内容
+                        if hasattr(dialog_widget, 'set_nested_content'):
+                            nested_title = "工具调用结果"
+                            nested_content = f"""
+工具名称: {message_info.get('content', '未知工具')}
+状态: 执行完成 ✅
+时间: {time.strftime('%H:%M:%S')}
+结果: {result[:200]}{'...' if len(result) > 200 else ''}
+                            """.strip()
+                            dialog_widget.set_nested_content(nested_title, nested_content)
+                        break
+        
+        # 在状态栏也显示工具执行结果
         s.progress_widget.status_label.setText(f"✅ {result[:50]}...")
         print(f"工具结果: {result}")
     
@@ -887,15 +992,11 @@ class ChatWindow(QWidget):
         # 计算alpha #
         alpha_px = int(BG_ALPHA * 255)
 
-        # 更新聊天历史背景 #
-        s.text.setStyleSheet(f"""
-            QTextEdit {{
-                background: rgba(17,17,17,{alpha_px});
-                color: #fff;
-                border-radius: 15px;
-                border: 1px solid rgba(255, 255, 255, 50);
-                font: 16pt 'Lucida Console';
-                padding: 10px;
+        # 更新聊天区域背景 - 现在使用透明背景，对话框有自己的背景
+        s.chat_content.setStyleSheet(f"""
+            QWidget {{
+                background: transparent;
+                border: none;
             }}
         """)
 

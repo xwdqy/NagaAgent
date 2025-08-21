@@ -16,9 +16,9 @@ class AppLauncherAgent(object):
     name = "AppLauncher Agent"  # Agent名称 #
 
     def __init__(self):
-        # 初始化综合扫描器 #
+        # 初始化综合扫描器（异步初始化，不阻塞） #
         self.scanner = get_comprehensive_scanner()  # 获取扫描器 #
-        print(f'✅ AppLauncherAgent初始化完成，综合应用数: {len(self.scanner.get_apps())}')  # 初始化信息 #
+        print(f'✅ AppLauncherAgent初始化完成，应用扫描将在首次使用时异步执行')  # 初始化信息 #
 
     async def handle_handoff(self, data: dict) -> str:
         """
@@ -31,16 +31,16 @@ class AppLauncherAgent(object):
                 return json.dumps({"success": False, "status": "error", "message": "缺少tool_name参数", "data": {}}, ensure_ascii=False)
             
             if tool_name == "启动应用":
-                # 智能应用启动工具 #
+                # 智能应用启动工具 - 两轮交互逻辑 #
                 app = data.get("app")
                 args = data.get("args")
                 
                 if not app:
-                    # 没有提供应用名称，返回应用列表 #
-                    result = self._get_apps_list()
+                    # 第一轮：LLM请求启动应用，直接返回应用列表供选择 #
+                    result = await self._get_apps_list()
                 else:
-                    # 提供了应用名称，尝试启动应用 #
-                    result = self._open_app(app, args)
+                    # 第二轮：LLM提供应用名称，启动指定应用 #
+                    result = await self._open_app(app, args)
                 
                 return json.dumps(result, ensure_ascii=False)
             
@@ -50,16 +50,29 @@ class AppLauncherAgent(object):
         except Exception as e:
             return json.dumps({"success": False, "status": "error", "message": str(e), "data": {}}, ensure_ascii=False)
 
-    def _get_apps_list(self) -> dict:
-        """获取应用列表供LLM选择 #"""
+    async def _get_apps_list(self) -> dict:
+        """第一轮交互：异步获取应用列表供LLM选择 #"""
         try:
-            app_info = self.scanner.get_app_info_for_llm()
+            app_info = await self.scanner.get_app_info_for_llm()
             
             return {
                 "success": True,
                 "status": "apps_ready",
-                "message": f"成功获取到 {app_info['total_count']} 个可用应用，请从列表中选择要启动的应用",
-                "data": app_info
+                "message": f"✅ 已获取到 {app_info['total_count']} 个可用应用。请从下方列表中选择要启动的应用，然后使用以下格式进行第二次调用：",
+                "data": {
+                    "total_count": app_info['total_count'],
+                    "apps": app_info['apps'],
+                    "application_format": {
+                        "tool_name": "启动应用",
+                        "app": "应用名称（必填，从上述列表中选择）",
+                        "args": "启动参数（可选）"
+                    },
+                    "example": {
+                        "tool_name": "启动应用",
+                        "app": "Chrome",
+                        "args": ""
+                    }
+                }
             }
         except Exception as e:
             return {
@@ -69,28 +82,38 @@ class AppLauncherAgent(object):
                 "data": {}
             }
 
-    def _open_app(self, app_name: str, args: str = None) -> dict:
-        """启动指定应用 #"""
+    async def _open_app(self, app_name: str, args: str = None) -> dict:
+        """第二轮交互：异步启动指定应用 #"""
         try:
             print(f"🔍 查找应用: {app_name}")
             
             # 从综合扫描器中查找应用 #
-            app_info = self.scanner.find_app_by_name(app_name)
+            app_info = await self.scanner.find_app_by_name(app_name)
             
             if not app_info:
                 # 如果没找到，返回可用应用列表供LLM重新选择 #
-                available_apps = self.scanner.get_apps()
-                app_names = [app["name"] for app in available_apps[:20]]  # 只显示前20个 #
+                app_info = await self.scanner.get_app_info_for_llm()
+                available_apps = app_info["apps"][:20]  # 只显示前20个 #
                 
                 return {
                     "success": False,
                     "status": "app_not_found",
-                    "message": f"未找到应用 '{app_name}'，请从以下可用应用中选择: {', '.join(app_names)}",
+                    "message": f"❌ 未找到应用 '{app_name}'。请从以下可用应用中选择，然后使用以下格式重新调用：",
                     "data": {
                         "requested_app": app_name,
-                        "available_apps": app_names,
-                        "total_available": len(available_apps),
-                        "suggestion": "请使用 'open' 工具（不提供app参数）获取完整应用列表"
+                        "available_apps": available_apps,
+                        "total_available": app_info["total_count"],
+                        "application_format": {
+                            "tool_name": "启动应用",
+                            "app": "应用名称（必填，从上述列表中选择）",
+                            "args": "启动参数（可选）"
+                        },
+                        "example": {
+                            "tool_name": "启动应用",
+                            "app": "Chrome",
+                            "args": ""
+                        },
+                        "suggestion": "请重新调用启动应用工具（不提供app参数）获取完整应用列表"
                     }
                 }
             

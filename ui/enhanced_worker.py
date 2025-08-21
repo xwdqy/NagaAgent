@@ -167,8 +167,8 @@ class StreamingWorker(EnhancedWorker):
             self.tool_extractor.set_callbacks(
                 on_text_chunk=self._on_text_chunk_sync,
                 on_sentence=self._on_sentence_sync,
-                on_tool_call=self._on_tool_call_sync,
-                on_tool_result=self._on_tool_result_sync
+                on_tool_result=self._on_tool_result_sync,
+                tool_call_detected_signal=self.tool_call_detected.emit
             )
         except ImportError as e:
             print(f"流式工具调用提取器导入失败: {e}")
@@ -223,20 +223,6 @@ class StreamingWorker(EnhancedWorker):
             # 句子级别的特殊处理
             # print(f"完成句子: {sentence}")  # 调试输出，已注释
             pass  # 可以在这里添加语音合成逻辑
-    
-    async def _on_tool_call(self, tool_call: str, tool_type: str):
-        """处理工具调用回调"""
-        if tool_type == "tool_call":
-            # 发送工具调用检测信号
-            self.tool_call_detected.emit("正在执行工具调用...")
-            print(f"检测到工具调用: {tool_call[:100]}...")
-    
-    def _on_tool_call_sync(self, tool_call: str, tool_type: str):
-        """同步处理工具调用回调（用于非异步环境）"""
-        if tool_type == "tool_call":
-            # 发送工具调用检测信号
-            self.tool_call_detected.emit("正在执行工具调用...")
-            print(f"检测到工具调用: {tool_call[:100]}...")
     
     async def _on_tool_result(self, result: str, result_type: str):
         """处理工具结果回调"""

@@ -322,7 +322,11 @@ class NagaConversation: # 对话主类
             # 流式响应处理
             content = ""
             async for chunk in resp:
-                if chunk.choices[0].delta.content:
+                # 安全检查：确保chunk.choices不为空且有内容
+                if (chunk.choices and 
+                    len(chunk.choices) > 0 and 
+                    hasattr(chunk.choices[0], 'delta') and 
+                    chunk.choices[0].delta.content):
                     content += chunk.choices[0].delta.content
             return {
                 'content': content,
@@ -344,7 +348,11 @@ class NagaConversation: # 对话主类
                 # 流式响应处理
                 content = ""
                 async for chunk in resp:
-                    if chunk.choices[0].delta.content:
+                    # 安全检查：确保chunk.choices不为空且有内容
+                    if (chunk.choices and 
+                        len(chunk.choices) > 0 and 
+                        hasattr(chunk.choices[0], 'delta') and 
+                        chunk.choices[0].delta.content):
                         content += chunk.choices[0].delta.content
                 return {
                     'content': content,
@@ -550,12 +558,6 @@ class NagaConversation: # 对话主类
                         print(f"完成句子: {sentence}")
                     return None
                 
-                def on_tool_call(tool_call: str, tool_type: str):
-                    """处理工具调用 - 不发送到前端"""
-                    if tool_type == "tool_call":
-                        print(f"🔧 检测到工具调用: {tool_call[:100]}...")
-                    return None
-                
                 def on_tool_result(result: str, result_type: str):
                     """处理工具结果 - 不发送到前端"""
                     if result_type == "tool_result":
@@ -568,7 +570,6 @@ class NagaConversation: # 对话主类
                 tool_extractor.set_callbacks(
                     on_text_chunk=on_text_chunk,
                     on_sentence=on_sentence,
-                    on_tool_call=on_tool_call,
                     on_tool_result=on_tool_result,
                     tool_calls_queue=tool_calls_queue
                 )
@@ -584,7 +585,11 @@ class NagaConversation: # 对话主类
                 
                 # 处理流式响应
                 async for chunk in resp:
-                    if chunk.choices[0].delta.content:
+                    # 安全检查：确保chunk.choices不为空且有内容
+                    if (chunk.choices and 
+                        len(chunk.choices) > 0 and 
+                        hasattr(chunk.choices[0], 'delta') and 
+                        chunk.choices[0].delta.content):
                         content = chunk.choices[0].delta.content
                         # 使用流式工具调用提取器处理内容
                         results = await tool_extractor.process_text_chunk(content)
@@ -635,7 +640,11 @@ class NagaConversation: # 对话主类
                             
                             # 处理LLM的继续响应 - 也需要通过流式工具调用提取器处理
                             async for chunk in resp2:
-                                if chunk.choices[0].delta.content:
+                                # 安全检查：确保chunk.choices不为空且有内容
+                                if (chunk.choices and 
+                                    len(chunk.choices) > 0 and 
+                                    hasattr(chunk.choices[0], 'delta') and 
+                                    chunk.choices[0].delta.content):
                                     content = chunk.choices[0].delta.content
                                     # 使用流式工具调用提取器处理内容
                                     results = await tool_extractor.process_text_chunk(content)

@@ -2,6 +2,7 @@
 import winreg  # Windows注册表 #
 import os  # 操作系统 #
 import glob  # 文件匹配 #
+import asyncio  # 异步 #
 from typing import List, Dict, Optional  # 类型 #
 import json  # JSON #
 
@@ -10,18 +11,27 @@ class ComprehensiveAppScanner:
     
     def __init__(self):
         self.apps_cache = []  # 应用缓存 #
-        self._scan_all_sources()  # 扫描所有来源 #
+        self._scan_completed = False  # 扫描完成标志 #
+        self._scan_lock = asyncio.Lock()  # 扫描锁 #
     
-    def _scan_all_sources(self):
-        """扫描所有应用来源 #"""
+    async def ensure_scan_completed(self):
+        """确保扫描已完成，如果未完成则异步执行扫描 #"""
+        if not self._scan_completed:
+            async with self._scan_lock:
+                if not self._scan_completed:
+                    await self._scan_all_sources_async()
+                    self._scan_completed = True
+    
+    async def _scan_all_sources_async(self):
+        """异步扫描所有应用来源 #"""
         apps = []
         
-        # 1. 扫描注册表 #
-        registry_apps = self._scan_registry()
+        # 1. 异步扫描注册表 #
+        registry_apps = await self._scan_registry_async()
         apps.extend(registry_apps)
         
-        # 2. 扫描快捷方式 #
-        shortcut_apps = self._scan_shortcuts()
+        # 2. 异步扫描快捷方式 #
+        shortcut_apps = await self._scan_shortcuts_async()
         apps.extend(shortcut_apps)
         
         # 3. 去重并合并，优先选择快捷方式 #
@@ -30,8 +40,14 @@ class ComprehensiveAppScanner:
         self.apps_cache = unique_apps
         print(f"✅ 综合扫描完成，共找到 {len(self.apps_cache)} 个应用")
     
-    def _scan_registry(self) -> List[Dict]:
-        """扫描Windows注册表获取应用信息 #"""
+    async def _scan_registry_async(self) -> List[Dict]:
+        """异步扫描Windows注册表获取应用信息 #"""
+        # 在线程池中执行同步的注册表扫描 #
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._scan_registry_sync)
+    
+    def _scan_registry_sync(self) -> List[Dict]:
+        """同步扫描Windows注册表获取应用信息 #"""
         apps = []
         
         # 扫描HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths
@@ -138,8 +154,14 @@ class ComprehensiveAppScanner:
         
         return apps
     
-    def _scan_shortcuts(self) -> List[Dict]:
-        """扫描快捷方式获取应用信息 #"""
+    async def _scan_shortcuts_async(self) -> List[Dict]:
+        """异步扫描快捷方式获取应用信息 #"""
+        # 在线程池中执行同步的快捷方式扫描 #
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._scan_shortcuts_sync)
+    
+    def _scan_shortcuts_sync(self) -> List[Dict]:
+        """同步扫描快捷方式获取应用信息 #"""
         apps = []
         
         # 扫描开始菜单快捷方式
@@ -252,12 +274,14 @@ class ComprehensiveAppScanner:
         
         return result
     
-    def get_apps(self) -> List[Dict]:
-        """获取扫描到的应用列表 #"""
+    async def get_apps(self) -> List[Dict]:
+        """异步获取扫描到的应用列表 #"""
+        await self.ensure_scan_completed()
         return self.apps_cache.copy()
     
-    def find_app_by_name(self, name: str) -> Optional[Dict]:
-        """根据名称查找应用，支持智能匹配 #"""
+    async def find_app_by_name(self, name: str) -> Optional[Dict]:
+        """异步根据名称查找应用，支持智能匹配 #"""
+        await self.ensure_scan_completed()
         name_lower = name.lower()
         
         # 精确匹配
@@ -272,36 +296,23 @@ class ComprehensiveAppScanner:
         
         return None
     
-    def refresh_apps(self):
-        """刷新应用列表 #"""
-        self._scan_all_sources()
+    async def refresh_apps(self):
+        """异步刷新应用列表 #"""
+        async with self._scan_lock:
+            self._scan_completed = False
+            await self._scan_all_sources_async()
+            self._scan_completed = True
     
-    def get_app_info_for_llm(self) -> Dict:
-        """获取供LLM选择的应用信息格式 #"""
-        apps = self.get_apps()
-        app_list = []
+    async def get_app_info_for_llm(self) -> Dict:
+        """异步获取供LLM选择的应用信息格式 #"""
+        await self.ensure_scan_completed()
         
-        for app in apps:
-            app_list.append({
-                "name": app["name"],
-                "description": app["description"],
-                "type": app["type"],
-                "source": app["source"]
-            })
+        # 直接返回应用名称列表，简化格式
+        app_names = [app["name"] for app in self.apps_cache]
         
         return {
-            "total_count": len(app_list),
-            "apps": app_list,
-            "usage_format": {
-                "tool_name": "open",
-                "app": "应用名称（从上述列表中选择）",
-                "args": "启动参数（可选）"
-            },
-            "example": {
-                "tool_name": "open",
-                "app": "notepad",
-                "args": ""
-            }
+            "total_count": len(app_names),
+            "apps": app_names
         }
 
 # 全局实例 #
@@ -314,7 +325,7 @@ def get_comprehensive_scanner() -> ComprehensiveAppScanner:
         _comprehensive_scanner = ComprehensiveAppScanner()
     return _comprehensive_scanner
 
-def refresh_comprehensive_apps():
-    """刷新综合应用列表 #"""
+async def refresh_comprehensive_apps():
+    """异步刷新综合应用列表 #"""
     scanner = get_comprehensive_scanner()
-    scanner.refresh_apps()
+    await scanner.refresh_apps()

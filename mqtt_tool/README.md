@@ -20,7 +20,7 @@ MQTT设备开关控制工具是一个基于MCP（Model Context Protocol）的智
 ```
 mqtt_tool/
 ├── device_switch.py          # MCP设备开关控制工具
-├── test_mqtt_tool.py     # 功能测试脚本
+├── test_device_switch.py     # 功能测试脚本
 ├── test_complete_system.py   # 完整系统测试
 ├── demo_reconnect.py         # 重连功能演示
 ├── README.md                 # 使用说明
@@ -46,7 +46,7 @@ pip install paho-mqtt mcp
     "broker": "broker.emqx.io",
     "port": 1883,
     "topic": "device/switch",
-    "client_id": "mcp_mqtt_tool",
+    "client_id": "mcp_device_switch",
     "username": "",
     "password": ""
   }
@@ -59,7 +59,7 @@ pip install paho-mqtt mcp
 
 ```bash
 cd mqtt_tool
-python test_mqtt_tool.py
+python test_device_switch.py
 ```
 
 ### 4. 使用MCP工具
@@ -87,7 +87,7 @@ result = switch_devices(0, 0)
 | `broker` | string | broker.emqx.io | MQTT服务器地址 |
 | `port` | integer | 1883 | MQTT服务器端口 |
 | `topic` | string | device/switch | MQTT主题 |
-| `client_id` | string | mcp_mqtt_tool | 客户端ID |
+| `client_id` | string | mcp_device_switch | 客户端ID |
 | `username` | string | "" | 用户名（可选） |
 | `password` | string | "" | 密码（可选） |
 

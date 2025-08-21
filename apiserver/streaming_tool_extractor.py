@@ -9,10 +9,43 @@ import re
 import json
 import logging
 import asyncio
-from typing import Callable, Optional, Dict, Any
+from typing import Callable, Optional, Dict, Any, Union
 from .tool_call_utils import parse_tool_calls, execute_tool_calls
 
-logger = logging.getLogger("StreamingToolExtractor")
+logger = logging.getLogger("StreamingToolCallExtractor")
+
+class CallbackManager:
+    """回调函数管理器 - 统一处理同步/异步回调"""
+    
+    def __init__(self):
+        self.callbacks = {}
+        self.callback_types = {}  # 缓存回调函数类型
+    
+    def register_callback(self, name: str, callback: Optional[Callable]):
+        """注册回调函数"""
+        self.callbacks[name] = callback
+        if callback:
+            # 缓存函数类型，避免重复检查
+            self.callback_types[name] = asyncio.iscoroutinefunction(callback)
+        else:
+            self.callback_types[name] = False
+    
+    async def call_callback(self, name: str, *args, **kwargs):
+        """统一调用回调函数"""
+        callback = self.callbacks.get(name)
+        if not callback:
+            return None
+            
+        try:
+            if self.callback_types.get(name, False):
+                # 异步回调
+                return await callback(*args, **kwargs)
+            else:
+                # 同步回调
+                return callback(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"回调函数 {name} 执行错误: {e}")
+            return None
 
 class StreamingToolCallExtractor:
     """流式工具调用提取器"""
@@ -25,11 +58,8 @@ class StreamingToolCallExtractor:
         self.text_buffer = ""  # 普通文本缓冲区
         self.sentence_endings = r"[。？！；\.\?\!\;]"  # 断句标点
         
-        # 回调函数
-        self.on_text_chunk = None  # 文本块回调
-        self.on_sentence = None    # 句子回调
-        self.on_tool_call = None   # 工具调用回调
-        self.on_tool_result = None # 工具结果回调
+        # 使用回调管理器
+        self.callback_manager = CallbackManager()
         
         # 语音集成（可选）
         self.voice_integration = None
@@ -40,17 +70,19 @@ class StreamingToolCallExtractor:
     def set_callbacks(self, 
                      on_text_chunk: Optional[Callable] = None,
                      on_sentence: Optional[Callable] = None,
-                     on_tool_call: Optional[Callable] = None,
                      on_tool_result: Optional[Callable] = None,
                      voice_integration=None,
-                     tool_calls_queue=None):
+                     tool_calls_queue=None,
+                     tool_call_detected_signal=None):
         """设置回调函数"""
-        self.on_text_chunk = on_text_chunk
-        self.on_sentence = on_sentence
-        self.on_tool_call = on_tool_call
-        self.on_tool_result = on_tool_result
+        # 注册回调函数
+        self.callback_manager.register_callback("text_chunk", on_text_chunk)
+        self.callback_manager.register_callback("sentence", on_sentence)
+        self.callback_manager.register_callback("tool_result", on_tool_result)
+        
         self.voice_integration = voice_integration
         self.tool_calls_queue = tool_calls_queue
+        self.tool_call_detected_signal = tool_call_detected_signal
     
     async def process_text_chunk(self, text_chunk: str):
         """处理文本块，分离普通文本和工具调用"""
@@ -107,43 +139,19 @@ class StreamingToolCallExtractor:
                             complete_sentence = sentences[0] + char  # 包含标点
                             if complete_sentence.strip():
                                 # 发送文本块回调（用于前端显示）
-                                if self.on_text_chunk:
-                                    try:
-                                        # 尝试异步调用
-                                        if asyncio.iscoroutinefunction(self.on_text_chunk):
-                                            result = await self.on_text_chunk(complete_sentence, "chunk")
-                                        else:
-                                            # 同步调用
-                                            result = self.on_text_chunk(complete_sentence, "chunk")
-                                        
-                                        if result:
-                                            results.append(result)
-                                    except Exception as e:
-                                        logger.error(f"文本块回调错误: {e}")
+                                result = await self.callback_manager.call_callback(
+                                    "text_chunk", complete_sentence, "chunk"
+                                )
+                                if result:
+                                    results.append(result)
                                 
                                 # 发送句子回调（用于其他处理）
-                                if self.on_sentence:
-                                    try:
-                                        # 尝试异步调用
-                                        if asyncio.iscoroutinefunction(self.on_sentence):
-                                            await self.on_sentence(complete_sentence, "sentence")
-                                        else:
-                                            # 同步调用
-                                            self.on_sentence(complete_sentence, "sentence")
-                                    except Exception as e:
-                                        logger.error(f"句子回调错误: {e}")
+                                await self.callback_manager.call_callback(
+                                    "sentence", complete_sentence, "sentence"
+                                )
                                 
                                 # 发送到语音集成（普通文本，非工具调用）
-                                if self.voice_integration:
-                                    try:
-                                        import threading
-                                        threading.Thread(
-                                            target=self.voice_integration.receive_text_chunk,
-                                            args=(complete_sentence,),
-                                            daemon=True
-                                        ).start()
-                                    except Exception as e:
-                                        logger.error(f"语音集成错误: {e}")
+                                await self._send_to_voice_integration(complete_sentence)
                             
                             # 更新缓冲区，过滤空字符串
                             remaining_sentences = [s for s in sentences[1:] if s.strip()]
@@ -156,57 +164,34 @@ class StreamingToolCallExtractor:
         """刷新文本缓冲区"""
         if self.text_buffer:
             # 发送文本块
-            if self.on_text_chunk:
-                try:
-                    # 尝试异步调用
-                    if asyncio.iscoroutinefunction(self.on_text_chunk):
-                        result = await self.on_text_chunk(self.text_buffer, "chunk")
-                    else:
-                        # 同步调用
-                        result = self.on_text_chunk(self.text_buffer, "chunk")
-                    
-                    if result:
-                        # 返回数据给调用者
-                        return result
-                except Exception as e:
-                    logger.error(f"文本块回调错误: {e}")
+            result = await self.callback_manager.call_callback(
+                "text_chunk", self.text_buffer, "chunk"
+            )
             
             # 发送到语音集成（普通文本，非工具调用）
-            if self.voice_integration:
-                try:
-                    import threading
-                    threading.Thread(
-                        target=self.voice_integration.receive_text_chunk,
-                        args=(self.text_buffer,),
-                        daemon=True
-                    ).start()
-                except Exception as e:
-                    logger.error(f"语音集成错误: {e}")
+            await self._send_to_voice_integration(self.text_buffer)
             
             self.text_buffer = ""
+            return result
         return None
     
-
+    async def _send_to_voice_integration(self, text: str):
+        """发送文本到语音集成"""
+        if self.voice_integration:
+            try:
+                import threading
+                threading.Thread(
+                    target=self.voice_integration.receive_text_chunk,
+                    args=(text,),
+                    daemon=True
+                ).start()
+            except Exception as e:
+                logger.error(f"语音集成错误: {e}")
     
     async def _extract_tool_call(self, tool_call_text: str):
         """提取工具调用 - 不执行，只提取到队列"""
         try:
             logger.info(f"检测到工具调用: {tool_call_text[:100]}...")
-            
-            # 发送工具调用回调
-            if self.on_tool_call:
-                try:
-                    # 尝试异步调用
-                    if asyncio.iscoroutinefunction(self.on_tool_call):
-                        result = await self.on_tool_call(tool_call_text, "tool_call")
-                    else:
-                        # 同步调用
-                        result = self.on_tool_call(tool_call_text, "tool_call")
-                    
-                    if result:
-                        return result
-                except Exception as e:
-                    logger.error(f"工具调用回调错误: {e}")
             
             # 解析JSON
             tool_calls = parse_tool_calls(tool_call_text)
@@ -219,6 +204,13 @@ class StreamingToolCallExtractor:
                     for tool_call in tool_calls:
                         self.tool_calls_queue.put(tool_call)
                     logger.info(f"已将 {len(tool_calls)} 个工具调用添加到队列")
+                
+                # 发送工具调用检测信号
+                if self.tool_call_detected_signal:
+                    try:
+                        self.tool_call_detected_signal("正在执行工具调用...")
+                    except Exception as e:
+                        logger.error(f"发送工具调用检测信号失败: {e}")
                 
                 # 返回工具调用检测提示 - 使用HTML格式与普通消息保持一致
                 return ("娜迦", f"<span style='color:#888;font-size:14pt;font-family:Lucida Console;'>🔧 检测到工具调用，正在执行...</span>")

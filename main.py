@@ -205,7 +205,7 @@ service_manager.start_background_services()
 n = NagaConversation()
 
 # 初始化进度文件
-with open('./ui/progress.txt', 'w') as f:
+with open('./ui/styles/progress.txt', 'w') as f:
     f.write('0')
 
 # 显示系统状态
