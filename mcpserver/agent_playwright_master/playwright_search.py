@@ -5,7 +5,7 @@ import re
 import json
 import urllib.parse
 from typing import List, Dict, Any
-from config import EDGE_LNK_PATH, EDGE_COMMON_PATHS
+from config import config
 
 class SearchEngine:
     """搜索引擎适配器，支持多种搜索引擎"""
@@ -163,21 +163,21 @@ def get_edge_path():
     if platform.system() != "Windows":
         return None  # 仅Windows下处理
     # 1. 解析.lnk
-    if os.path.exists(EDGE_LNK_PATH):
+    if os.path.exists(config.browser.edge_lnk_path):
         try:
             import pythoncom
             from win32com.shell import shell
             shortcut = pythoncom.CoCreateInstance(
                 shell.CLSID_ShellLink, None, pythoncom.CLSCTX_INPROC_SERVER, shell.IID_IShellLink
             )
-            shortcut.QueryInterface(shell.IID_IPersistFile).Load(EDGE_LNK_PATH)
+            shortcut.QueryInterface(shell.IID_IPersistFile).Load(config.browser.edge_lnk_path)
             exe = shortcut.GetPath(shell.SLGP_UNCPRIORITY)[0]
             if exe and os.path.exists(exe):
                 return exe
         except Exception as e:
             sys.stderr.write(f"Edge .lnk解析失败: {e}\n")
     # 2. 遍历常见目录
-    for p in EDGE_COMMON_PATHS:
+    for p in config.browser.edge_common_paths:
         if os.path.exists(p):
             return p
     raise RuntimeError("未检测到Microsoft Edge浏览器，请先安装Edge或检查.lnk路径！")
@@ -199,7 +199,7 @@ async def search_web(query: str, engine: str = "google") -> Dict[str, Any]:
     
     # 尝试从config导入，如果失败则使用默认值
     try:
-        from config import PLAYWRIGHT_HEADLESS
+        from config import config
     except ImportError:
         PLAYWRIGHT_HEADLESS = True
     
@@ -213,11 +213,11 @@ async def search_web(query: str, engine: str = "google") -> Dict[str, Any]:
         # 启动浏览器
         playwright = await async_playwright().start()
         try:
-            browser = await playwright.chromium.launch(headless=PLAYWRIGHT_HEADLESS, channel="msedge")  # 优先用官方Edge通道
+            browser = await playwright.chromium.launch(headless=config.browser.playwright_headless, channel="msedge")  # 优先用官方Edge通道
         except Exception as e:
             sys.stderr.write(f"用channel方式启动Edge失败: {e}，尝试executable_path方式\n")
             edge_path = get_edge_path()
-            browser = await playwright.chromium.launch(headless=PLAYWRIGHT_HEADLESS, executable_path=edge_path)
+            browser = await playwright.chromium.launch(headless=config.browser.playwright_headless, executable_path=edge_path)
         page = await browser.new_page()
         
         # 访问搜索页面

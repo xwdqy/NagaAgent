@@ -37,8 +37,8 @@ class VoiceIntegration:
         self.tts_url = f"http://127.0.0.1:{config.tts.port}/v1/audio/speech"
         
         # 音频播放配置
-        self.min_sentence_length = 5  # 最小句子长度
-        self.max_concurrent_tasks = 3  # 最大并发任务数
+        self.min_sentence_length = 5  # 最小句子长度（硬编码默认值）
+        self.max_concurrent_tasks = 3  # 最大并发任务数（硬编码默认值）
         
         # 并发控制
         self.tts_semaphore = threading.Semaphore(2)  # 限制TTS请求并发数为2
@@ -232,7 +232,7 @@ class VoiceIntegration:
                 self.tts_url,
                 json=payload,
                 headers=headers,
-                timeout=30
+                timeout=30  # 硬编码超时时间（秒）
             )
             
             if response.status_code == 200:
@@ -333,7 +333,7 @@ class VoiceIntegration:
         
         while True:
             try:
-                time.sleep(60)  # 每60秒清理一次
+                time.sleep(60)  # 每60秒清理一次（硬编码清理间隔）
                 
                 # 获取所有音频文件
                 audio_files = list(self.audio_temp_dir.glob(f"*.{config.tts.default_format}"))
@@ -341,7 +341,7 @@ class VoiceIntegration:
                 # 清理文件
                 files_to_clean = []
                 for file_path in audio_files:
-                    # 检查文件是否过旧（超过5分钟）
+                    # 检查文件是否过旧（超过5分钟，硬编码超时时间）
                     if time.time() - file_path.stat().st_mtime > 300:
                         files_to_clean.append(file_path)
                 

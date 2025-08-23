@@ -1,18 +1,36 @@
-﻿# config.py - Pydantic配置系统
+﻿# config.py - 简化配置系统
 """
 NagaAgent 配置系统 - 基于Pydantic实现类型安全和验证
+支持配置热更新和变更通知
 """
 import os
-import platform
 import json
 from pathlib import Path
-from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Callable
 from pydantic import BaseModel, Field, field_validator
 
+# 配置变更监听器
+_config_listeners: List[Callable] = []
+
+def add_config_listener(callback: Callable):
+    """添加配置变更监听器"""
+    _config_listeners.append(callback)
+
+def remove_config_listener(callback: Callable):
+    """移除配置变更监听器"""
+    if callback in _config_listeners:
+        _config_listeners.remove(callback)
+
+def notify_config_changed():
+    """通知所有监听器配置已变更"""
+    for listener in _config_listeners:
+        try:
+            listener()
+        except Exception as e:
+            print(f"配置监听器执行失败: {e}")
 
 def setup_environment():
-    """设置环境变量解决各种兼容性问题"""
+    """设置环境变量解决兼容性问题"""
     env_vars = {
         "OMP_NUM_THREADS": "1",
         "MKL_NUM_THREADS": "1", 
@@ -23,23 +41,8 @@ def setup_environment():
         "PYTORCH_MPS_HIGH_WATERMARK_RATIO": "0.0",
         "PYTORCH_ENABLE_MPS_FALLBACK": "1"
     }
-
     for key, value in env_vars.items():
         os.environ.setdefault(key, value)
-
-    # 代理配置处理
-    original_proxy = os.environ.get("ALL_PROXY", "")
-    no_proxy_hosts = "127.0.0.1,localhost,0.0.0.0"
-
-    if original_proxy:
-        existing_no_proxy = os.environ.get("NO_PROXY", "")
-        if existing_no_proxy:
-            os.environ["NO_PROXY"] = f"{existing_no_proxy},{no_proxy_hosts}"
-        else:
-            os.environ["NO_PROXY"] = no_proxy_hosts
-    else:
-        os.environ["NO_PROXY"] = no_proxy_hosts
-
 
 class SystemConfig(BaseModel):
     """系统基础配置"""
@@ -50,6 +53,7 @@ class SystemConfig(BaseModel):
     stream_mode: bool = Field(default=True, description="是否启用流式响应")
     debug: bool = Field(default=False, description="是否启用调试模式")
     log_level: str = Field(default="INFO", description="日志级别")
+    save_prompts: bool = Field(default=True, description="是否保存提示词")
 
     @field_validator('log_level')
     @classmethod
@@ -59,7 +63,6 @@ class SystemConfig(BaseModel):
             raise ValueError(f'日志级别必须是以下之一: {valid_levels}')
         return v.upper()
 
-
 class APIConfig(BaseModel):
     """API服务配置"""
     api_key: str = Field(default="sk-placeholder-key-not-set", description="API密钥")
@@ -68,26 +71,6 @@ class APIConfig(BaseModel):
     temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="温度参数")
     max_tokens: int = Field(default=2000, ge=1, le=8192, description="最大token数")
     max_history_rounds: int = Field(default=10, ge=1, le=100, description="最大历史轮数")
-    # 额外可选参数
-    top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Top-p采样参数")
-    timeout: Optional[int] = Field(default=None, ge=1, le=300, description="请求超时时间")
-    retry_count: Optional[int] = Field(default=None, ge=0, le=10, description="重试次数")
-
-    @field_validator('api_key')
-    @classmethod
-    def validate_api_key(cls, v):
-        if v and v != "sk-placeholder-key-not-set":
-            try:
-                v.encode('ascii')
-            except UnicodeEncodeError:
-                raise ValueError("API密钥包含非ASCII字符")
-        return v
-
-    @property
-    def model_name(self) -> str:
-        """兼容旧版本的模型名称属性"""
-        return self.model
-
 
 class APIServerConfig(BaseModel):
     """API服务器配置"""
@@ -97,30 +80,19 @@ class APIServerConfig(BaseModel):
     auto_start: bool = Field(default=True, description="启动时自动启动API服务器")
     docs_enabled: bool = Field(default=True, description="是否启用API文档")
 
-
 class GRAGConfig(BaseModel):
     """GRAG知识图谱记忆系统配置"""
-    enabled: bool = Field(default=False, description="是否启用GRAG记忆系统")  # 关闭GRAG记忆系统
-    auto_extract: bool = Field(default=False, description="是否自动提取对话中的五元组")  # 关闭五元组提取
+    enabled: bool = Field(default=False, description="是否启用GRAG记忆系统")
+    auto_extract: bool = Field(default=False, description="是否自动提取对话中的五元组")
     context_length: int = Field(default=5, ge=1, le=20, description="记忆上下文长度")
     similarity_threshold: float = Field(default=0.6, ge=0.0, le=1.0, description="记忆检索相似度阈值")
     neo4j_uri: str = Field(default="neo4j://127.0.0.1:7687", description="Neo4j连接URI")
     neo4j_user: str = Field(default="neo4j", description="Neo4j用户名")
     neo4j_password: str = Field(default="your_password", description="Neo4j密码")
     neo4j_database: str = Field(default="neo4j", description="Neo4j数据库名")
-    
-    # 任务管理器配置
-    task_manager_enabled: bool = Field(default=True, description="是否启用任务管理器")
-    max_workers: int = Field(default=3, ge=1, le=10, description="最大并发工作线程数")
-    max_queue_size: int = Field(default=100, ge=10, le=1000, description="最大任务队列大小")
-    task_timeout: int = Field(default=30, ge=5, le=300, description="单个任务超时时间（秒）")
-    auto_cleanup_hours: int = Field(default=24, ge=1, le=168, description="自动清理任务保留时间（小时）")
-    
-    # 兼容旧版本的字段
-    extraction_timeout: Optional[int] = Field(default=None, description="提取超时时间（秒）")
-    extraction_retries: Optional[int] = Field(default=None, description="提取重试次数")
-    base_timeout: Optional[int] = Field(default=None, description="基础超时时间（秒）")
-
+    extraction_timeout: int = Field(default=12, ge=1, le=60, description="知识提取超时时间（秒）")
+    extraction_retries: int = Field(default=2, ge=0, le=5, description="知识提取重试次数")
+    base_timeout: int = Field(default=15, ge=5, le=120, description="基础操作超时时间（秒）")
 
 class HandoffConfig(BaseModel):
     """工具调用循环配置"""
@@ -128,49 +100,9 @@ class HandoffConfig(BaseModel):
     max_loop_non_stream: int = Field(default=5, ge=1, le=20, description="非流式模式最大工具调用循环次数")
     show_output: bool = Field(default=False, description="是否显示工具调用输出")
 
-
-class MCPConfig(BaseModel):
-    """MCP服务配置
-    
-    注意：系统现在使用动态服务池查询，通过扫描agent-manifest.json文件自动发现和注册服务。
-    以下配置字段主要用于静态配置和向后兼容性。
-    """
-    # 特殊工具名配置
-    agent_tool_name: str = Field(
-        default="agent",
-        description="用于调用Agent的特殊工具名"
-    )
-    
-    # 服务冲突处理
-    agent_priority: bool = Field(
-        default=True,
-        description="当服务名冲突时，Agent服务优先"
-    )
-    
-    # 自动发现配置（现在默认启用）
-    auto_discover_agents: bool = Field(
-        default=True,
-        description="自动发现和注册Agent服务（推荐启用）"
-    )
-    
-    auto_discover_mcp: bool = Field(
-        default=True,
-        description="自动发现和注册MCP服务（推荐启用）"
-    )
-    
-    # 服务过滤配置
-    exclude_agent_tools_from_mcp: bool = Field(
-        default=True,
-        description="从MCP服务中排除已注册为Agent的服务"
-    )
-
-
 class BrowserConfig(BaseModel):
     """浏览器配置"""
-    path: Optional[str] = Field(default=None, description="浏览器可执行文件路径")
     playwright_headless: bool = Field(default=False, description="Playwright浏览器是否无头模式")
-    
-    # Edge浏览器相关配置
     edge_lnk_path: str = Field(
         default=r'C:\Users\DREEM\Desktop\Microsoft Edge.lnk',
         description="Edge浏览器快捷方式路径"
@@ -184,50 +116,9 @@ class BrowserConfig(BaseModel):
         description="Edge浏览器常见安装路径"
     )
 
-    @field_validator('path', mode='before')
-    @classmethod
-    def detect_browser_path(cls, v):
-        if v and os.path.exists(v):
-            return v
-
-        system = platform.system()
-        paths = []
-
-        if system == "Windows":
-            paths = [
-                r'C:\Program Files\Google\Chrome\Application\chrome.exe',
-                r'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe',
-                os.path.expanduser(r'~\AppData\Local\Google\Chrome\Application\chrome.exe'),
-                r'C:\Users\DREEM\Desktop\Google Chrome.lnk'
-            ]
-        elif system == "Darwin":  # macOS
-            paths = [
-                '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-                '/Applications/Chromium.app/Contents/MacOS/Chromium',
-                '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-                os.path.expanduser('~/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'),
-            ]
-        elif system == "Linux":
-            paths = [
-                '/usr/bin/google-chrome',
-                '/usr/bin/chromium-browser',
-                '/usr/bin/chromium',
-                '/snap/bin/chromium',
-                '/usr/bin/google-chrome-stable'
-            ]
-
-        for path in paths:
-            if os.path.exists(path):
-                return path
-
-        # 如果未找到浏览器，给出警告但不阻止启动
-        print("警告：未检测到浏览器，请手动设置BROWSER_PATH环境变量")
-        return None
-
-
 class TTSConfig(BaseModel):
     """TTS服务配置"""
-    api_key: str = Field(default="your_api_key_here", description="TTS服务API密钥")
+    api_key: str = Field(default="", description="TTS服务API密钥")
     port: int = Field(default=5048, ge=1, le=65535, description="TTS服务端口")
     default_voice: str = Field(default="zh-CN-XiaoxiaoNeural", description="默认语音")
     default_format: str = Field(default="mp3", description="默认音频格式")
@@ -236,18 +127,6 @@ class TTSConfig(BaseModel):
     remove_filter: bool = Field(default=False, description="是否移除过滤")
     expand_api: bool = Field(default=True, description="是否扩展API")
     require_api_key: bool = Field(default=False, description="是否需要API密钥")
-    
-    # 新增配置项
-    provider: str = Field(default="edgetts", description="TTS提供商(edgetts/minimax)")
-    group_id: str = Field(default="your_minimax_group_id_here", description="Minimax的group_id")
-    tts_model: str = Field(default="speech-02-hd", description="TTS模型名称")
-    emotion: str = Field(default="neutral", description="情感参数")
-    minimax_emotion: str = Field(default="neutral", description="Minimax情感参数")
-    keep_audio_files: bool = Field(default=False, description="是否保留音频文件用于调试")
-
-
-
-
 
 class FilterConfig(BaseModel):
     """输出过滤配置"""
@@ -263,12 +142,11 @@ class FilterConfig(BaseModel):
     )
     clean_output: bool = Field(default=True, description="清理多余空白字符")
 
-
 class DifficultyConfig(BaseModel):
     """问题难度判断配置"""
-    enabled: bool = Field(default=False, description="是否启用难度判断")  # 关闭难度判断
+    enabled: bool = Field(default=False, description="是否启用难度判断")
     use_small_model: bool = Field(default=False, description="使用小模型进行难度判断")
-    pre_assessment: bool = Field(default=False, description="是否启用前置难度判断")  # 关闭前置判断
+    pre_assessment: bool = Field(default=False, description="是否启用前置难度判断")
     assessment_timeout: float = Field(default=1.0, ge=0.1, le=5.0, description="难度判断超时时间（秒）")
     deep_thinking_threshold: int = Field(default=3, ge=1, le=5, description="启用深度思考的难度阈值")
     difficulty_levels: List[str] = Field(
@@ -283,10 +161,9 @@ class DifficultyConfig(BaseModel):
     threshold_medium: int = Field(default=4, ge=1, le=10, description="中等问题阈值")
     threshold_hard: int = Field(default=6, ge=1, le=10, description="困难问题阈值")
 
-
 class ScoringConfig(BaseModel):
     """黑白名单打分系统配置"""
-    enabled: bool = Field(default=False, description="是否启用打分系统")  # 关闭打分系统
+    enabled: bool = Field(default=False, description="是否启用打分系统")
     score_range: List[int] = Field(default=[1, 5], description="评分范围")
     score_threshold: int = Field(default=2, ge=1, le=5, description="结果保留阈值")
     similarity_threshold: float = Field(default=0.85, ge=0.0, le=1.0, description="相似结果识别阈值")
@@ -299,10 +176,9 @@ class ScoringConfig(BaseModel):
     min_results_required: int = Field(default=2, ge=1, le=10, description="最少保留结果数量")
     strict_filtering: bool = Field(default=True, description="严格过滤模式")
 
-
 class ThinkingConfig(BaseModel):
     """思考完整性判断配置"""
-    enabled: bool = Field(default=False, description="是否启用思考完整性判断")  # 关闭思考完整性判断
+    enabled: bool = Field(default=False, description="是否启用思考完整性判断")
     use_small_model: bool = Field(default=False, description="使用小模型判断思考完整性")
     completeness_criteria: List[str] = Field(
         default=["问题分析充分", "解决方案明确", "逻辑链条完整", "结论清晰合理"],
@@ -310,8 +186,11 @@ class ThinkingConfig(BaseModel):
     )
     completeness_threshold: float = Field(default=0.8, ge=0.0, le=1.0, description="完整性阈值")
     max_thinking_depth: int = Field(default=5, ge=1, le=10, description="最大思考深度层级")
-    next_question_generation: bool = Field(default=False, description="生成下一级问题")  # 关闭下一级问题生成
+    next_question_generation: bool = Field(default=False, description="生成下一级问题")
 
+class WeatherConfig(BaseModel):
+    """天气服务配置"""
+    api_key: str = Field(default="", description="天气服务API密钥")
 
 class MQTTConfig(BaseModel):
     """MQTT配置"""
@@ -325,35 +204,6 @@ class MQTTConfig(BaseModel):
     keepalive: int = Field(default=60, ge=1, le=3600, description="保持连接时间（秒）")
     qos: int = Field(default=1, ge=0, le=2, description="服务质量等级")
 
-
-class WeatherConfig(BaseModel):
-    """天气服务配置"""
-    api_key: str = Field(default="", description="天气服务API密钥")
-
-
-class NagaPortalConfig(BaseModel):
-    """娜迦官网账户配置"""
-    portal_url: str = Field(default="https://naga.furina.chat/", description="娜迦官网地址")
-    username: str = Field(default="", description="娜迦官网用户名")
-    password: str = Field(default="", description="娜迦官网密码")
-    # 其他参数使用默认值，无需在config.json中配置
-    request_timeout: int = Field(default=15, ge=1, le=120, description="请求超时时间(秒)")
-    retry_times: int = Field(default=2, ge=0, le=10, description="请求重试次数")
-    default_headers: Dict[str, str] = Field(
-        default_factory=lambda: {
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "accept": "application/json, text/plain, */*",
-            "content-type": "application/json"
-        },
-        description="默认请求头"
-    )
-    login_payload_mode: str = Field(default="json", description="登录载荷模式(json|form)")
-    login_username_key: str = Field(default="username", description="登录用户名字段名")
-    login_password_key: str = Field(default="password", description="登录密码字段名")
-    login_path: str = Field(default="/api/user/login", description="登录API路径")
-    turnstile_param: str = Field(default="", description="Turnstile验证参数")
-
-
 class UIConfig(BaseModel):
     """用户界面配置"""
     user_name: str = Field(default="用户", description="默认用户名")
@@ -364,15 +214,32 @@ class UIConfig(BaseModel):
     mac_btn_gap: int = Field(default=12, ge=0, le=30, description="Mac按钮间距")
     animation_duration: int = Field(default=600, ge=100, le=2000, description="动画时长（毫秒）")
 
-    @field_validator('user_name', mode='before')
-    @classmethod
-    def detect_user_name(cls, v):
-        if v and v != "用户":
-            return v
-        # 自动检测系统用户名
-        import os
-        return os.getenv('COMPUTERNAME') or os.getenv('USERNAME') or "用户"
+class NagaPortalConfig(BaseModel):
+    """娜迦官网账户配置"""
+    portal_url: str = Field(default="https://naga.furina.chat/", description="娜迦官网地址")
+    username: str = Field(default="", description="娜迦官网用户名")
+    password: str = Field(default="", description="娜迦官网密码")
+    request_timeout: int = Field(default=30, ge=5, le=120, description="请求超时时间（秒）")
+    login_path: str = Field(default="/api/user/login", description="登录API路径")
+    turnstile_param: str = Field(default="", description="Turnstile验证参数")
+    login_username_key: str = Field(default="username", description="登录请求中用户名的键名")
+    login_password_key: str = Field(default="password", description="登录请求中密码的键名")
+    login_payload_mode: str = Field(default="json", description="登录请求载荷模式：json或form")
+    default_headers: Dict[str, str] = Field(
+        default={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "Content-Type": "application/json"
+        },
+        description="默认HTTP请求头"
+    )
 
+class OnlineSearchConfig(BaseModel):
+    """在线搜索配置"""
+    Bocha_API_KEY: str = Field(default="-", description="博查API密钥")
+    Bocha_Url: str = Field(default="https://api.bochaai.com/v1/web-search", description="博查API地址")
+    Bocha_count: int = Field(default=5, ge=1, le=20, description="博查搜索结果数量")
 
 class SystemPrompts(BaseModel):
     """系统提示词配置"""
@@ -421,8 +288,7 @@ Agent服务：
 - 当用户请求需要执行具体操作时，优先使用工具调用而不是直接回答
 
 
-""",
-        description="娜迦系统提示词"
+"""
     )
 
     next_question_prompt: str = Field(
@@ -437,7 +303,6 @@ Agent服务：
         description="下一级问题生成系统提示词"
     )
 
-
 class NagaConfig(BaseModel):
     """NagaAgent主配置类"""
     system: SystemConfig = Field(default_factory=SystemConfig)
@@ -445,228 +310,94 @@ class NagaConfig(BaseModel):
     api_server: APIServerConfig = Field(default_factory=APIServerConfig)
     grag: GRAGConfig = Field(default_factory=GRAGConfig)
     handoff: HandoffConfig = Field(default_factory=HandoffConfig)
-    mcp: MCPConfig = Field(default_factory=MCPConfig)
     browser: BrowserConfig = Field(default_factory=BrowserConfig)
     tts: TTSConfig = Field(default_factory=TTSConfig)
-
     filter: FilterConfig = Field(default_factory=FilterConfig)
     difficulty: DifficultyConfig = Field(default_factory=DifficultyConfig)
     scoring: ScoringConfig = Field(default_factory=ScoringConfig)
     thinking: ThinkingConfig = Field(default_factory=ThinkingConfig)
     prompts: SystemPrompts = Field(default_factory=SystemPrompts)
-    ui: UIConfig = Field(default_factory=UIConfig)
-    mqtt: MQTTConfig = Field(default_factory=MQTTConfig)
     weather: WeatherConfig = Field(default_factory=WeatherConfig)
+    mqtt: MQTTConfig = Field(default_factory=MQTTConfig)
+    ui: UIConfig = Field(default_factory=UIConfig)
     naga_portal: NagaPortalConfig = Field(default_factory=NagaPortalConfig)
+    online_search: OnlineSearchConfig = Field(default_factory=OnlineSearchConfig)
 
-    model_config = {
-        "extra": "ignore"
-    }
+    model_config = {"extra": "ignore"}
 
     def __init__(self, **kwargs):
-        # 设置环境变量
         setup_environment()
         super().__init__(**kwargs)
-
-        # 创建必要的目录
         self.system.log_dir.mkdir(exist_ok=True)
 
-        # API密钥验证和警告
-        if not self.api.api_key or self.api.api_key == "sk-placeholder-key-not-set":
-            print("警告：API密钥未配置")
-            print("请在 config.json 文件中设置正确的 api.api_key 值")
+# 全局配置实例
+ENCF = 0  # 编码修复计数器
 
-
-
-    @property
-    def output_filter_config_dict(self) -> Dict[str, Any]:
-        """返回输出过滤配置字典，兼容旧版本"""
-        return {
-            "filter_think_tags": self.filter.filter_think_tags,
-            "filter_patterns": self.filter.filter_patterns,
-            "clean_output": self.filter.clean_output,
-        }
-
-    @property
-    def difficulty_judgment_config_dict(self) -> Dict[str, Any]:
-        """返回难度判断配置字典，兼容旧版本"""
-        return {
-            "enabled": self.difficulty.enabled,
-            "use_small_model": self.difficulty.use_small_model,
-            "difficulty_levels": self.difficulty.difficulty_levels,
-            "factors": self.difficulty.factors,
-            "threshold_simple": self.difficulty.threshold_simple,
-            "threshold_medium": self.difficulty.threshold_medium,
-            "threshold_hard": self.difficulty.threshold_hard,
-        }
-
-    @property
-    def scoring_system_config_dict(self) -> Dict[str, Any]:
-        """返回打分系统配置字典，兼容旧版本"""
-        return {
-            "enabled": self.scoring.enabled,
-            "score_range": self.scoring.score_range,
-            "score_threshold": self.scoring.score_threshold,
-            "similarity_threshold": self.scoring.similarity_threshold,
-            "max_user_preferences": self.scoring.max_user_preferences,
-            "default_preferences": self.scoring.default_preferences,
-            "penalty_for_similar": self.scoring.penalty_for_similar,
-            "min_results_required": self.scoring.min_results_required,
-            "strict_filtering": self.scoring.strict_filtering,
-        }
-
-    @property
-    def thinking_completeness_config_dict(self) -> Dict[str, Any]:
-        """返回思考完整性配置字典，兼容旧版本"""
-        return {
-            "enabled": self.thinking.enabled,
-            "use_small_model": self.thinking.use_small_model,
-            "completeness_criteria": self.thinking.completeness_criteria,
-            "completeness_threshold": self.thinking.completeness_threshold,
-            "max_thinking_depth": self.thinking.max_thinking_depth,
-            "next_question_generation": self.thinking.next_question_generation,
-        }
-
-
-# 创建全局配置实例 - 从JSON文件加载
 def load_config():
     """加载配置"""
+    global ENCF
     config_path = "config.json"
+    
     if os.path.exists(config_path):
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
                 config_data = json.load(f)
-            # 设置环境变量
-            setup_environment()
             return NagaConfig(**config_data)
         except Exception as e:
             print(f"警告：加载 {config_path} 失败: {e}")
             print("使用默认配置")
+            
+            if ENCF > 1:
+                print(f"警告：加载 {config_path} 失败: {e}")
+                print("使用默认配置")
+                return NagaConfig()
+            
+            ENCF += 1
+            try:
+                # 尝试修复编码问题
+                with open(config_path, 'r', encoding='ISO-8859-1') as f:
+                    con = f.read()
+                with open(config_path, 'w', encoding='utf-8') as f:
+                    f.write(con)
+                print("已经修复编码")
+                
+                # 重新尝试加载配置
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config_data = json.load(f)
+                return NagaConfig(**config_data)
+            except Exception as e2:
+                print(f"警告：加载 {config_path} 失败: {e2}")
+                print("使用默认配置")
+                return NagaConfig()
     else:
         print(f"警告：配置文件 {config_path} 不存在，使用默认配置")
     
-    # 设置环境变量并返回默认配置
-    setup_environment()
     return NagaConfig()
 
 config = load_config()
 
-# 为了兼容旧版本代码，提供所有旧变量名的映射
-NAGA_VERSION = config.system.version
-VOICE_ENABLED = config.system.voice_enabled
-BASE_DIR = config.system.base_dir
-LOG_DIR = config.system.log_dir
-STREAM_MODE = config.system.stream_mode
-DEBUG = config.system.debug
-LOG_LEVEL = config.system.log_level
-
-API_KEY = config.api.api_key
-BASE_URL = config.api.base_url
-MODEL = config.api.model
-MODEL_NAME = config.api.model_name
-TEMPERATURE = config.api.temperature
-MAX_TOKENS = config.api.max_tokens
-MAX_HISTORY_ROUNDS = config.api.max_history_rounds
-
-API_SERVER_ENABLED = config.api_server.enabled
-API_SERVER_HOST = config.api_server.host
-API_SERVER_PORT = config.api_server.port
-API_SERVER_AUTO_START = config.api_server.auto_start
-API_SERVER_DOCS_ENABLED = config.api_server.docs_enabled
-
-GRAG_ENABLED = config.grag.enabled
-GRAG_AUTO_EXTRACT = config.grag.auto_extract
-GRAG_CONTEXT_LENGTH = config.grag.context_length
-GRAG_SIMILARITY_THRESHOLD = config.grag.similarity_threshold
-GRAG_NEO4J_URI = config.grag.neo4j_uri
-GRAG_NEO4J_USER = config.grag.neo4j_user
-GRAG_NEO4J_PASSWORD = config.grag.neo4j_password
-GRAG_NEO4J_DATABASE = config.grag.neo4j_database
-
-MAX_handoff_LOOP_STREAM = config.handoff.max_loop_stream
-MAX_handoff_LOOP_NON_STREAM = config.handoff.max_loop_non_stream
-SHOW_handoff_OUTPUT = config.handoff.show_output
-
-BROWSER_PATH = config.browser.path
-PLAYWRIGHT_HEADLESS = config.browser.playwright_headless
-
-TTS_API_KEY = config.tts.api_key
-TTS_PORT = config.tts.port
-TTS_DEFAULT_VOICE = config.tts.default_voice
-TTS_DEFAULT_FORMAT = config.tts.default_format
-TTS_DEFAULT_SPEED = config.tts.default_speed
-TTS_DEFAULT_LANGUAGE = config.tts.default_language
-
-
-
-# MQTT配置兼容性变量
-MQTT_ENABLED = config.mqtt.enabled
-MQTT_BROKER = config.mqtt.broker
-MQTT_PORT = config.mqtt.port
-MQTT_TOPIC = config.mqtt.topic
-MQTT_CLIENT_ID = config.mqtt.client_id
-MQTT_USERNAME = config.mqtt.username
-MQTT_PASSWORD = config.mqtt.password
-MQTT_KEEPALIVE = config.mqtt.keepalive
-MQTT_QOS = config.mqtt.qos
-
-# 天气配置兼容性变量
-WEATHER_API_KEY = config.weather.api_key
-
-# 配置字典，兼容旧版本
-OUTPUT_FILTER_CONFIG = config.output_filter_config_dict
-DIFFICULTY_JUDGMENT_CONFIG = config.difficulty_judgment_config_dict
-SCORING_SYSTEM_CONFIG = config.scoring_system_config_dict
-THINKING_COMPLETENESS_CONFIG = config.thinking_completeness_config_dict
-
-# MCP配置兼容性变量
-MCP_AGENT_TOOL_NAME = config.mcp.agent_tool_name
-MCP_AGENT_PRIORITY = config.mcp.agent_priority
-MCP_AUTO_DISCOVER_AGENTS = config.mcp.auto_discover_agents
-MCP_AUTO_DISCOVER_MCP = config.mcp.auto_discover_mcp
-MCP_EXCLUDE_AGENT_TOOLS_FROM_MCP = config.mcp.exclude_agent_tools_from_mcp
-
-# 系统提示词
-NAGA_SYSTEM_PROMPT = config.prompts.naga_system_prompt
-NEXT_QUESTION_SYSTEM_PROMPT = config.prompts.next_question_prompt
-
-# 工具函数
-def get_current_date() -> str:
-    """获取当前日期"""
-    return datetime.now().strftime("%Y-%m-%d")
-
-def get_current_time() -> str:
-    """获取当前时间"""
-    return datetime.now().strftime("%H:%M:%S")
-
-def get_current_datetime() -> str:
-    """获取当前日期时间"""
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
 def reload_config() -> NagaConfig:
     """重新加载配置"""
     global config
-    config = NagaConfig()
+    config = load_config()
+    notify_config_changed()
     return config
 
-def save_config_to_file(filename: str = "config_backup.json"):
-    """保存当前配置到文件"""
-    with open(filename, 'w', encoding='utf-8') as f:
-        f.write(config.json(ensure_ascii=False, indent=2))
+def hot_reload_config() -> NagaConfig:
+    """热更新配置 - 重新加载配置并通知所有模块"""
+    global config
+    old_config = config
+    config = load_config()
+    notify_config_changed()
+    print(f"配置已热更新: {old_config.system.version} -> {config.system.version}")
+    return config
 
-def load_config_from_file(filename: str = "config_backup.json") -> NagaConfig:
-    """从文件加载配置"""
-    with open(filename, 'r', encoding='utf-8') as f:
-        data = f.read()
-    return NagaConfig.parse_raw(data)
+def get_config() -> NagaConfig:
+    """获取当前配置"""
+    return config
 
 # 初始化时打印配置信息
 if config.system.debug:
     print(f"NagaAgent {config.system.version} 配置已加载")
     print(f"API服务器: {'启用' if config.api_server.enabled else '禁用'} ({config.api_server.host}:{config.api_server.port})")
     print(f"GRAG记忆系统: {'启用' if config.grag.enabled else '禁用'}")
-
-
-# Edge浏览器相关全局变量
-EDGE_LNK_PATH = config.browser.edge_lnk_path
-EDGE_COMMON_PATHS = config.browser.edge_common_paths

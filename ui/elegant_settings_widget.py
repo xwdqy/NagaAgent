@@ -595,13 +595,7 @@ class ElegantSettingsWidget(QWidget):
             tts_port_card = SettingCard("TTS端口", "TTS服务端口", tts_port_spin, "tts.port")
             tts_port_card.value_changed.connect(self.on_setting_changed)
             group.add_card(tts_port_card)
-        if hasattr(config.tts, "keep_audio_files"):
-            keep_audio_checkbox = QCheckBox()
-            keep_audio_checkbox.setChecked(config.tts.keep_audio_files)
-            keep_audio_checkbox.setStyleSheet(self.get_checkbox_style() + "color: #fff;")
-            keep_audio_card = SettingCard("保留音频文件", "保留TTS生成的音频文件用于调试", keep_audio_checkbox, "tts.keep_audio_files")
-            keep_audio_card.value_changed.connect(self.on_setting_changed)
-            group.add_card(keep_audio_checkbox)
+
         parent_layout.addWidget(group)
 
     def create_weather_group(self, parent_layout):
@@ -950,10 +944,14 @@ class ElegantSettingsWidget(QWidget):
             with open(config_path, 'w', encoding='utf-8') as f:
                 json.dump(config_data, f, ensure_ascii=False, indent=2)
             
-            # 动态更新config对象
-            from config import load_config
-            global config
-            config = load_config()
+            # 使用配置管理器进行热更新
+            from config_manager import update_config
+            # 将扁平化的配置键值对转换为嵌套字典格式
+            nested_updates = self._convert_to_nested_updates(self.pending_changes)
+            success = update_config(nested_updates)
+            if not success:
+                self.update_status_label("✗ 配置更新失败")
+                return
                     
             self.update_status_label(f"✓ 已保存 {success_count}/{changes_count} 项设置")
             self.pending_changes.clear()
@@ -972,6 +970,31 @@ class ElegantSettingsWidget(QWidget):
             webbrowser.open("https://naga.furina.chat/")
         except Exception as e:
             print(f"打开娜迦API网站失败: {e}")
+    
+    def _convert_to_nested_updates(self, flat_updates: dict) -> dict:
+        """将扁平化的配置键值对转换为嵌套字典格式"""
+        nested_updates = {}
+        
+        for setting_key, value in flat_updates.items():
+            # 解析嵌套的配置键 (例如 "api.api_key")
+            keys = setting_key.split('.')
+            current = nested_updates
+            
+            # 导航到父级
+            for key in keys[:-1]:
+                if key not in current:
+                    current[key] = {}
+                current = current[key]
+            
+            # 设置值，处理特殊转换
+            final_key = keys[-1]
+            if setting_key in ['api.temperature', 'grag.similarity_threshold', 'ui.bg_alpha']:
+                # 温度、相似度、透明度值从0-100转换为0.0-1.0
+                current[final_key] = value / 100.0
+            else:
+                current[final_key] = value
+        
+        return nested_updates
     
     def reset_settings(self):
         """重置所有设置"""

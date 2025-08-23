@@ -1,5 +1,5 @@
 from agents import Agent
-from config import *  # 统一变量管理 #
+from config import config  # 统一变量管理 #
 import asyncio
 import json
 try:
@@ -23,7 +23,7 @@ class SystemControlAgent(Agent):
             name=self.name,
             instructions=self.instructions,
             tools=[],
-            model=MODEL_NAME
+            model=config.api.model
         )
         self._shutdown_pending = False  # 关机待确认状态 #
         self._shutdown_time = 0  # 待确认的关机时间 #
