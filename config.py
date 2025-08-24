@@ -70,7 +70,7 @@ class APIConfig(BaseModel):
     model: str = Field(default="deepseek-chat", description="使用的模型名称")
     temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="温度参数")
     max_tokens: int = Field(default=2000, ge=1, le=8192, description="最大token数")
-    max_history_rounds: int = Field(default=10, ge=1, le=100, description="最大历史轮数")
+    max_history_rounds: int = Field(default=100, ge=1, le=200, description="最大历史轮数")
 
 class APIServerConfig(BaseModel):
     """API服务器配置"""

@@ -124,7 +124,9 @@ def visualize_quintuples():
 
         try:
             print("尝试打开浏览器...")
-            webbrowser.open(html_file)
+            # 获取正确的绝对路径
+            abs_html_path = os.path.abspath(html_file)
+            webbrowser.open("file:///" + abs_html_path)
             print("浏览器打开成功！")
         except Exception as e:
             print(f"无法自动打开浏览器：{e}")

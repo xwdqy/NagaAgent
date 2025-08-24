@@ -1241,7 +1241,15 @@ class ChatWindow(QWidget):
                         visualize_quintuples()
                         if os.path.exists(graph_file):
                             import webbrowser
-                            webbrowser.open(graph_file)
+                            # 获取正确的绝对路径
+                            if os.path.isabs(graph_file):
+                                abs_graph_path = graph_file
+                            else:
+                                # 如果是相对路径，基于项目根目录构建绝对路径
+                                current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                                abs_graph_path = os.path.join(current_dir, graph_file)
+                            
+                            webbrowser.open("file:///" + abs_graph_path)
                             s.add_user_message("系统", "🧠 心智云图已生成并打开")
                         else:
                             s.add_user_message("系统", "❌ 心智云图生成失败")
@@ -1253,7 +1261,15 @@ class ChatWindow(QWidget):
             else:
                 # HTML文件存在，直接打开
                 import webbrowser
-                webbrowser.open(graph_file)
+                # 获取正确的绝对路径
+                if os.path.isabs(graph_file):
+                    abs_graph_path = graph_file
+                else:
+                    # 如果是相对路径，基于项目根目录构建绝对路径
+                    current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    abs_graph_path = os.path.join(current_dir, graph_file)
+                
+                webbrowser.open("file:///" + abs_graph_path)
                 s.add_user_message("系统", "🧠 心智云图已打开")
         except Exception as e:
             s.add_user_message("系统", f"❌ 打开心智云图失败: {str(e)}")

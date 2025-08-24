@@ -170,6 +170,7 @@ python check_env.py
 | 类别 | 依赖包 | 用途 |
 |------|--------|------|
 | **核心框架** | `openai`, `mcp`, `fastapi` | AI对话和API服务 |
+| **搜索工具** | `langchain-community` | SearXNG搜索集成 |
 | **GUI界面** | `PyQt5`, `pygame` | 图形用户界面 |
 | **语音处理** | `edge-tts`, `pyaudio`, `sounddevice` | 语音合成和识别 |
 | **知识图谱** | `py2neo`, `pyvis`, `matplotlib` | Neo4j图数据库操作 |
@@ -311,6 +312,17 @@ restore_config_snapshot(snapshot)
 }
 ```
 
+### 在线搜索配置
+```json
+{
+  "online_search": {
+    "searxng_url": "https://searxng.pylindex.top",
+    "engines": ["google"],
+    "num_results": 5
+  }
+}
+```
+
 ### GRAG知识图谱记忆系统配置
 ```json
 {
@@ -342,6 +354,12 @@ restore_config_snapshot(snapshot)
 - **流式输出**: 实时显示 AI 回复，提升交互体验
 - **工具调用**: 自动解析和执行 LLM 返回的工具调用指令
 - **深度思考**: 基于遗传算法的多分支思考引擎，提供更高质量的回答
+
+### 🔍 在线搜索系统
+- **SearXNG集成**: 基于 SearXNG 的隐私保护搜索引擎
+- **多引擎支持**: 支持Google、Bing等多种搜索引擎
+- **智能结果处理**: 自动格式化搜索结果，提供AI友好的信息展示
+- **灵活配置**: 可配置搜索引擎列表、结果数量等参数
 
 ### 🔄 配置热更新系统
 - **实时配置更新**: 配置变更立即生效，无需重启应用

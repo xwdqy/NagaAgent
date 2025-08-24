@@ -59,7 +59,13 @@ class AgentManager:
         self.config_dir = Path(config_dir) if config_dir else None
         self.agents: Dict[str, AgentConfig] = {}
         self.agent_sessions: Dict[str, Dict[str, AgentSession]] = {}
-        self.max_history_rounds = 7  # 最大历史轮数
+        # 从配置文件读取最大历史轮数
+        try:
+            from config import config
+            self.max_history_rounds = config.api.max_history_rounds
+        except ImportError:
+            self.max_history_rounds = 10  # 默认值
+            logger.warning("无法导入配置，使用默认历史轮数设置")
         self.context_ttl_hours = 24  # 上下文TTL（小时）
         self.debug_mode = True
         

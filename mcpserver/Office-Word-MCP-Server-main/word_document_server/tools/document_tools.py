@@ -11,7 +11,7 @@ from word_document_server.utils.document_utils import get_document_properties, e
 from word_document_server.core.styles import ensure_heading_style, ensure_table_style
 
 
-async def create_document(filename: str, title: Optional[str] = None, author: Optional[str] = None, save_path: Optional[str] = None) -> str:
+def create_document(filename: str, title: Optional[str] = None, author: Optional[str] = None, save_path: Optional[str] = None) -> str:
     """Create a new Word document with optional metadata and custom save path.
     
     Args:
@@ -47,6 +47,21 @@ async def create_document(filename: str, title: Optional[str] = None, author: Op
         ensure_heading_style(doc)
         ensure_table_style(doc)
         
+        # Add default content to prevent empty document
+        if title:
+            doc.add_heading(title, level=1)
+        else:
+            doc.add_heading('New Document', level=1)
+        
+        # Add a default paragraph with timestamp
+        from datetime import datetime
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        doc.add_paragraph(f'Document created on {current_time}')
+        
+        # If author is provided, add author information
+        if author:
+            doc.add_paragraph(f'Author: {author}')
+        
         # Save the document
         doc.save(full_path)
         
@@ -55,7 +70,7 @@ async def create_document(filename: str, title: Optional[str] = None, author: Op
         return f"Failed to create document: {str(e)}"
 
 
-async def get_document_info(filename: str) -> str:
+def get_document_info(filename: str) -> str:
     """Get information about a Word document.
     
     Args:
@@ -73,7 +88,7 @@ async def get_document_info(filename: str) -> str:
         return f"Failed to get document info: {str(e)}"
 
 
-async def get_document_text(filename: str) -> str:
+def get_document_text(filename: str) -> str:
     """Extract all text from a Word document.
     
     Args:
@@ -84,7 +99,7 @@ async def get_document_text(filename: str) -> str:
     return extract_document_text(filename)
 
 
-async def get_document_outline(filename: str) -> str:
+def get_document_outline(filename: str) -> str:
     """Get the structure of a Word document.
     
     Args:
@@ -96,7 +111,7 @@ async def get_document_outline(filename: str) -> str:
     return json.dumps(structure, indent=2)
 
 
-async def list_available_documents(directory: str = ".") -> str:
+def list_available_documents(directory: str = ".") -> str:
     """List all .docx files in the specified directory.
     
     Args:
@@ -122,7 +137,7 @@ async def list_available_documents(directory: str = ".") -> str:
         return f"Failed to list documents: {str(e)}"
 
 
-async def copy_document(source_filename: str, destination_filename: Optional[str] = None) -> str:
+def copy_document(source_filename: str, destination_filename: Optional[str] = None) -> str:
     """Create a copy of a Word document.
     
     Args:
@@ -141,7 +156,7 @@ async def copy_document(source_filename: str, destination_filename: Optional[str
         return f"Failed to copy document: {message}"
 
 
-async def merge_documents(target_filename: str, source_filenames: List[str], add_page_breaks: bool = True) -> str:
+def merge_documents(target_filename: str, source_filenames: List[str], add_page_breaks: bool = True) -> str:
     """Merge multiple Word documents into a single document.
     
     Args:

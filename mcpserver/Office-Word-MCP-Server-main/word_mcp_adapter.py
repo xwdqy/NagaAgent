@@ -48,7 +48,7 @@ class WordDocumentMCPServer:
             
             # 调用对应的工具函数
             handler = self.tool_mapping[tool_name]
-            result = await handler(data)
+            result = handler(data)
             
             return json.dumps({
                 "status": "ok",
@@ -67,7 +67,7 @@ class WordDocumentMCPServer:
             "data": ""
         }, ensure_ascii=False)
     
-    async def _help(self, data: dict) -> dict:
+    def _help(self, data: dict) -> dict:
         """显示帮助信息"""
         return {
             "available_tools": list(self.tool_mapping.keys()),
@@ -87,12 +87,13 @@ class WordDocumentMCPServer:
             ]
         }
     
-    async def _create_document(self, data: dict) -> dict:
+    def _create_document(self, data: dict) -> dict:
         """创建新的Word文档，支持自定义保存路径"""
         if not DOCX_AVAILABLE:
             raise Exception("python-docx未安装，无法创建Word文档")
         
-        filename = data.get("filename", "document.docx")
+        # 支持多种参数名：file_path, filename
+        filename = data.get("file_path") or data.get("filename", "document.docx")
         title = data.get("title", "")
         author = data.get("author", "")
         save_path = data.get("save_path", None)  # 新增保存路径参数
@@ -120,9 +121,18 @@ class WordDocumentMCPServer:
             if author:
                 doc.core_properties.author = author
             
-            # 如果有标题，添加标题段落
+            # 添加文档标题（如果提供了title）
             if title:
-                doc.add_heading(title, 0)
+                doc.add_heading(title, level=1)
+            
+            # 如果提供了content参数，添加内容段落
+            content = data.get("content", "")
+            if content:
+                doc.add_paragraph(content)
+            
+            # 如果作者信息存在，添加作者段落
+            if author:
+                doc.add_paragraph(f'Author: {author}')
             
             # 保存文档
             doc.save(full_path)
@@ -139,16 +149,17 @@ class WordDocumentMCPServer:
         except Exception as e:
             raise Exception(f"创建文档失败: {str(e)}")
     
-    async def _add_paragraph(self, data: dict) -> dict:
+    def _add_paragraph(self, data: dict) -> dict:
         """添加段落"""
         if not DOCX_AVAILABLE:
             raise Exception("python-docx未安装，无法编辑Word文档")
         
-        filename = data.get("filename")
+        # 支持多种参数名：file_path, filename
+        filename = data.get("file_path") or data.get("filename")
         text = data.get("text", "")
         
         if not filename:
-            raise Exception("缺少filename参数")
+            raise Exception("缺少file_path或filename参数")
         
         try:
             # 打开文档
@@ -171,17 +182,18 @@ class WordDocumentMCPServer:
         except Exception as e:
             raise Exception(f"添加段落失败: {str(e)}")
     
-    async def _add_heading(self, data: dict) -> dict:
+    def _add_heading(self, data: dict) -> dict:
         """添加标题"""
         if not DOCX_AVAILABLE:
             raise Exception("python-docx未安装，无法编辑Word文档")
         
-        filename = data.get("filename")
+        # 支持多种参数名：file_path, filename
+        filename = data.get("file_path") or data.get("filename")
         text = data.get("text", "")
         level = data.get("level", 1)
         
         if not filename:
-            raise Exception("缺少filename参数")
+            raise Exception("缺少file_path或filename参数")
         
         # 确保level是整数类型
         try:
@@ -215,18 +227,19 @@ class WordDocumentMCPServer:
         except Exception as e:
             raise Exception(f"添加标题失败: {str(e)}")
     
-    async def _add_table(self, data: dict) -> dict:
+    def _add_table(self, data: dict) -> dict:
         """添加表格"""
         if not DOCX_AVAILABLE:
             raise Exception("python-docx未安装，无法编辑Word文档")
         
-        filename = data.get("filename")
+        # 支持多种参数名：file_path, filename
+        filename = data.get("file_path") or data.get("filename")
         rows = data.get("rows", 2)
         cols = data.get("cols", 2)
         headers = data.get("headers", [])
         
         if not filename:
-            raise Exception("缺少filename参数")
+            raise Exception("缺少file_path或filename参数")
         
         # 确保rows和cols是整数类型
         try:
@@ -273,15 +286,16 @@ class WordDocumentMCPServer:
         except Exception as e:
             raise Exception(f"添加表格失败: {str(e)}")
     
-    async def _add_page_break(self, data: dict) -> dict:
+    def _add_page_break(self, data: dict) -> dict:
         """添加分页符"""
         if not DOCX_AVAILABLE:
             raise Exception("python-docx未安装，无法编辑Word文档")
         
-        filename = data.get("filename")
+        # 支持多种参数名：file_path, filename
+        filename = data.get("file_path") or data.get("filename")
         
         if not filename:
-            raise Exception("缺少filename参数")
+            raise Exception("缺少file_path或filename参数")
         
         try:
             # 打开文档
@@ -303,15 +317,16 @@ class WordDocumentMCPServer:
         except Exception as e:
             raise Exception(f"添加分页符失败: {str(e)}")
     
-    async def _get_document_info(self, data: dict) -> dict:
+    def _get_document_info(self, data: dict) -> dict:
         """获取文档信息"""
         if not DOCX_AVAILABLE:
             raise Exception("python-docx未安装，无法读取Word文档")
         
-        filename = data.get("filename")
+        # 支持多种参数名：file_path, filename
+        filename = data.get("file_path") or data.get("filename")
         
         if not filename:
-            raise Exception("缺少filename参数")
+            raise Exception("缺少file_path或filename参数")
         
         try:
             if not os.path.exists(filename):
@@ -336,15 +351,16 @@ class WordDocumentMCPServer:
         except Exception as e:
             raise Exception(f"获取文档信息失败: {str(e)}")
     
-    async def _get_document_text(self, data: dict) -> dict:
+    def _get_document_text(self, data: dict) -> dict:
         """获取文档文本内容"""
         if not DOCX_AVAILABLE:
             raise Exception("python-docx未安装，无法读取Word文档")
         
-        filename = data.get("filename")
+        # 支持多种参数名：file_path, filename
+        filename = data.get("file_path") or data.get("filename")
         
         if not filename:
-            raise Exception("缺少filename参数")
+            raise Exception("缺少file_path或filename参数")
         
         try:
             if not os.path.exists(filename):
@@ -367,7 +383,7 @@ class WordDocumentMCPServer:
         except Exception as e:
             raise Exception(f"获取文档文本失败: {str(e)}")
     
-    async def _list_available_documents(self, data: dict) -> dict:
+    def _list_available_documents(self, data: dict) -> dict:
         """列出可用文档"""
         directory = data.get("directory", ".")
         

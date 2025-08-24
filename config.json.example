@@ -1,102 +1,91 @@
 {
-  // 系统基础配置
   "system": {
-    "version": "3.0",                    // 系统版本号
-    "voice_enabled": true,               // 是否启用语音功能
-    "stream_mode": true,                 // 是否启用流式输出
-    "debug": false,                      // 是否启用调试模式
-    "log_level": "WARNING"               // 日志级别：DEBUG/INFO/WARNING/ERROR
+    "version": "3.0",
+    "voice_enabled": true,
+    "stream_mode": true,
+    "debug": false,
+    "log_level": "DEBUG",
+    "save_prompts": true
   },
-
-  // API配置（LLM接口）
   "api": {
-    "api_key": "your-api-key-here",      // LLM API密钥
-    "base_url": "https://api.deepseek.com/v1",  // API基础URL
-    "model": "deepseek-chat",            // 使用的模型名称
-    "temperature": 0.7,                  // 温度参数（0.0-1.0，控制随机性）
-    "max_tokens": 2000,                  // 最大输出token数
-    "max_history_rounds": 10             // 最大历史对话轮数
+    "api_key": " ",
+    "base_url": "https://phapi.furina.junmatec.cn/v1",
+    "model": " ",
+    "temperature": 0.7,
+    "max_tokens": 2000,
+    "max_history_rounds": 10
   },
-
-  // API服务器配置
   "api_server": {
-    "enabled": true,                     // 是否启用API服务器
-    "host": "127.0.0.1",                 // 服务器监听地址
-    "port": 8000,                        // 服务器端口
-    "auto_start": true,                  // 是否自动启动API服务器
-    "docs_enabled": true                 // 是否启用API文档
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 8000,
+    "auto_start": true,
+    "docs_enabled": true
   },
-
-  // GRAG知识图谱配置
   "grag": {
-    "enabled": true,                     // 是否启用GRAG记忆系统
-    "auto_extract": true,                // 是否自动提取知识
-    "context_length": 5,                 // 上下文长度
-    "similarity_threshold": 0.6,         // 相似度阈值
-    "neo4j_uri": "neo4j://127.0.0.1:7687",  // Neo4j数据库URI
-    "neo4j_user": "neo4j",               // Neo4j用户名
-    "neo4j_password": "your-neo4j-password",  // Neo4j密码
-    "neo4j_database": "neo4j"            // Neo4j数据库名
+    "enabled": true,
+    "auto_extract": true,
+    "context_length": 5,
+    "similarity_threshold": 0.6,
+    "neo4j_uri": "neo4j://127.0.0.1:7687",
+    "neo4j_user": "neo4j",
+    "neo4j_password": "Xx2017105",
+    "neo4j_database": "neo4j",
+    "extraction_timeout": 12,
+    "extraction_retries": 2,
+    "base_timeout": 15
   },
-
-  // 工具调用循环配置
   "handoff": {
-    "max_loop_stream": 5,                // 流式模式最大工具调用循环次数
-    "max_loop_non_stream": 5,            // 非流式模式最大工具调用循环次数
-    "show_output": false                 // 是否显示工具调用输出
+    "max_loop_stream": 5,
+    "max_loop_non_stream": 5,
+    "show_output": false
   },
-
-  // 浏览器配置
   "browser": {
-    "playwright_headless": false         // Playwright浏览器是否无头模式运行
+    "playwright_headless": false
   },
-
-  // 语音合成(TTS)配置
   "tts": {
-    "api_key": "your_tts_api_key_here",  // TTS API密钥
-    "port": 5050,                        // TTS服务端口
-    "default_voice": "en-US-AvaNeural",  // 默认语音
-    "default_format": "mp3",             // 默认音频格式
-    "default_speed": 1.0,                // 默认语速
-    "default_language": "en-US",         // 默认语言
-    "remove_filter": false,              // 是否移除过滤器
-    "expand_api": true,                  // 是否扩展API
-    "require_api_key": true              // 是否需要API密钥
+    "api_key": "",
+    "port": 5048,
+    "default_voice": "zh-CN-XiaoxiaoNeural",
+    "default_format": "mp3",
+    "default_speed": 1.0,
+    "default_language": "zh-CN",
+    "remove_filter": false,
+    "expand_api": true,
+    "require_api_key": false
   },
-
-
-
-  // 天气API密钥
-  "weather_api_key": "your-weather-api-key",  // 高德地图天气API密钥
-  
-  // MQTT配置
+  "weather": {
+    "api_key": " "
+  },
   "mqtt": {
-    "enabled": false,                        // 是否启用MQTT功能
-    "broker": "localhost",                   // MQTT代理服务器地址
-    "port": 1883,                           // MQTT代理服务器端口
-    "topic": "/test/topic",                 // MQTT主题
-    "client_id": "naga_mqtt_client",        // MQTT客户端ID
-    "username": "",                         // MQTT用户名
-    "password": "",                         // MQTT密码
-    "keepalive": 60,                        // 保持连接时间（秒）
-    "qos": 1                                // 服务质量等级
+    "enabled": true,
+    "broker": " ",
+    "port": 1883,
+    "topic": " ",
+    "client_id": " ",
+    "username": " ",
+    "password": " ",
+    "keepalive": 60,
+    "qos": 1
   },
-  
-  // 用户界面配置
   "ui": {
-    "user_name": "用户",                 // 用户名称
-    "bg_alpha": 0.5,                     // 背景透明度
-    "window_bg_alpha": 110,              // 窗口背景透明度
-    "mac_btn_size": 36,                  // Mac按钮大小
-    "mac_btn_margin": 16,                // Mac按钮边距
-    "mac_btn_gap": 12,                   // Mac按钮间距
-    "animation_duration": 600            // 动画持续时间（毫秒）
+    "user_name": "用户",
+    "bg_alpha": 0.81,
+    "window_bg_alpha": 128,
+    "mac_btn_size": 36,
+    "mac_btn_margin": 16,
+    "mac_btn_gap": 12,
+    "animation_duration": 600
   },
-
-  // 娜迦官网配置
   "naga_portal": {
-    "portal_url": "https://naga.furina.chat/",  // 娜迦官网地址
-    "username": "your-username",                // 娜迦官网用户名
-    "password": "your-password"                 // 娜迦官网密码
-  }
+    "portal_url": "https://naga.furina.chat/",
+    "username": " ",
+    "password": " "
+  },
+  "online_search": {
+    "searxng_url": "https://searxng.pylindex.top",
+    "engines": ["google"],
+    "num_results": 5
+  },
+  "invalid": "config"
 }

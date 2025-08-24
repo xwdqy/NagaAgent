@@ -1,10 +1,10 @@
 {
-  "name": "博查API搜索",
-  "displayName": "博查API搜索",
+  "name": "searxng搜索",
+  "displayName": "searxng搜索",
   "version": "1.0.0",
-  "author": "NagaAgent",
+  "author": "pyl(1708213363@qq.com)",
   "agentType": "mcp",
-  "description": "调用博查API进行网页搜索，返回相关实时信息",
+  "description": "searxng搜索，返回相关实时信息",
   "entryPoint": {
     "module": "mcpserver.agent_online_search.online_search_agent",
     "class": "OnlineSearchAgent",

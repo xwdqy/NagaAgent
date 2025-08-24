@@ -18,7 +18,7 @@ from word_document_server.core.footnotes import (
 )
 
 
-async def add_footnote_to_document(filename: str, paragraph_index: int, footnote_text: str) -> str:
+def add_footnote_to_document(filename: str, paragraph_index: int, footnote_text: str) -> str:
     """Add a footnote to a specific paragraph in a Word document.
     
     Args:
@@ -88,7 +88,7 @@ async def add_footnote_to_document(filename: str, paragraph_index: int, footnote
         return f"Failed to add footnote: {str(e)}"
 
 
-async def add_endnote_to_document(filename: str, paragraph_index: int, endnote_text: str) -> str:
+def add_endnote_to_document(filename: str, paragraph_index: int, endnote_text: str) -> str:
     """Add an endnote to a specific paragraph in a Word document.
     
     Args:
@@ -148,7 +148,7 @@ async def add_endnote_to_document(filename: str, paragraph_index: int, endnote_t
         return f"Failed to add endnote: {str(e)}"
 
 
-async def convert_footnotes_to_endnotes_in_document(filename: str) -> str:
+def convert_footnotes_to_endnotes_in_document(filename: str) -> str:
     """Convert all footnotes to endnotes in a Word document.
     
     Args:
@@ -232,7 +232,7 @@ async def convert_footnotes_to_endnotes_in_document(filename: str) -> str:
         return f"Failed to convert footnotes to endnotes: {str(e)}"
 
 
-async def customize_footnote_style(filename: str, numbering_format: str = "1, 2, 3", 
+def customize_footnote_style(filename: str, numbering_format: str = "1, 2, 3", 
                                   start_number: int = 1, font_name: Optional[str] = None,
                                   font_size: Optional[int] = None) -> str:
     """Customize footnote numbering and formatting in a Word document.

@@ -14,7 +14,7 @@ from word_document_server.utils.document_utils import find_and_replace_text
 from word_document_server.core.styles import ensure_heading_style, ensure_table_style
 
 
-async def add_heading(filename: str, text: str, level: int = 1) -> str:
+def add_heading(filename: str, text: str, level: int = 1) -> str:
     """Add a heading to a Word document.
     
     Args:
@@ -74,7 +74,7 @@ async def add_heading(filename: str, text: str, level: int = 1) -> str:
         return f"Failed to add heading: {str(e)}"
 
 
-async def add_paragraph(filename: str, text: str, style: Optional[str] = None) -> str:
+def add_paragraph(filename: str, text: str, style: Optional[str] = None) -> str:
     """Add a paragraph to a Word document.
     
     Args:
@@ -112,7 +112,7 @@ async def add_paragraph(filename: str, text: str, style: Optional[str] = None) -
         return f"Failed to add paragraph: {str(e)}"
 
 
-async def add_table(filename: str, rows: int, cols: int, data: Optional[List[List[str]]] = None) -> str:
+def add_table(filename: str, rows: int, cols: int, data: Optional[List[List[str]]] = None) -> str:
     """Add a table to a Word document.
     
     Args:
@@ -159,7 +159,7 @@ async def add_table(filename: str, rows: int, cols: int, data: Optional[List[Lis
         return f"Failed to add table: {str(e)}"
 
 
-async def add_picture(filename: str, image_path: str, width: Optional[float] = None) -> str:
+def add_picture(filename: str, image_path: str, width: Optional[float] = None) -> str:
     """Add an image to a Word document.
     
     Args:
@@ -218,7 +218,7 @@ async def add_picture(filename: str, image_path: str, width: Optional[float] = N
         return f"Document processing error: {error_type} - {error_msg or 'No error details available'}"
 
 
-async def add_page_break(filename: str) -> str:
+def add_page_break(filename: str) -> str:
     """Add a page break to the document.
     
     Args:
@@ -243,7 +243,7 @@ async def add_page_break(filename: str) -> str:
         return f"Failed to add page break: {str(e)}"
 
 
-async def add_table_of_contents(filename: str, title: str = "Table of Contents", max_level: int = 3) -> str:
+def add_table_of_contents(filename: str, title: str = "Table of Contents", max_level: int = 3) -> str:
     """Add a table of contents to a Word document based on heading styles.
     
     Args:
@@ -332,7 +332,7 @@ async def add_table_of_contents(filename: str, title: str = "Table of Contents",
         return f"Failed to add table of contents: {str(e)}"
 
 
-async def delete_paragraph(filename: str, paragraph_index: int) -> str:
+def delete_paragraph(filename: str, paragraph_index: int) -> str:
     """Delete a paragraph from a document.
     
     Args:
@@ -368,7 +368,7 @@ async def delete_paragraph(filename: str, paragraph_index: int) -> str:
         return f"Failed to delete paragraph: {str(e)}"
 
 
-async def search_and_replace(filename: str, find_text: str, replace_text: str) -> str:
+def search_and_replace(filename: str, find_text: str, replace_text: str) -> str:
     """Search for text and replace all occurrences.
     
     Args:

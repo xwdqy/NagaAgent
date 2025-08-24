@@ -17,7 +17,7 @@ from word_document_server.core.styles import create_style
 from word_document_server.core.tables import apply_table_style
 
 
-async def format_text(filename: str, paragraph_index: int, start_pos: int, end_pos: int, 
+def format_text(filename: str, paragraph_index: int, start_pos: int, end_pos: int, 
                      bold: Optional[bool] = None, italic: Optional[bool] = None, 
                      underline: Optional[bool] = None, color: Optional[str] = None,
                      font_size: Optional[int] = None, font_name: Optional[str] = None) -> str:
@@ -127,7 +127,7 @@ async def format_text(filename: str, paragraph_index: int, start_pos: int, end_p
         return f"Failed to format text: {str(e)}"
 
 
-async def create_custom_style(filename: str, style_name: str, 
+def create_custom_style(filename: str, style_name: str, 
                              bold: Optional[bool] = None, italic: Optional[bool] = None,
                              font_size: Optional[int] = None, font_name: Optional[str] = None,
                              color: Optional[str] = None, base_style: Optional[str] = None) -> str:
@@ -184,7 +184,7 @@ async def create_custom_style(filename: str, style_name: str,
         return f"Failed to create style: {str(e)}"
 
 
-async def format_table(filename: str, table_index: int, 
+def format_table(filename: str, table_index: int, 
                       has_header_row: Optional[bool] = None,
                       border_style: Optional[str] = None,
                       shading: Optional[List[List[str]]] = None) -> str:

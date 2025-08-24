@@ -186,7 +186,10 @@ def main(): # 主程序
             return
 
         if success:
-            webbrowser.open("logs/knowledge_graph/graph.html")
+            main_dir = os.path.dirname(os.path.abspath(__file__))
+            parent_dir = os.path.dirname(main_dir)
+            graph_path = os.path.join(parent_dir, "logs", "knowledge_graph", "graph.html")
+            webbrowser.open("file:///" + graph_path)
             print("\n知识图谱已生成：logs/knowledge_graph/graph.html")
             print("请输入查询问题（输入空行退出）：")
             while True:

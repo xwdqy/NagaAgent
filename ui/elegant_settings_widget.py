@@ -387,7 +387,7 @@ class ElegantSettingsWidget(QWidget):
         # 该项表示上下文对话轮数，即系统会保留最近多少轮对话内容作为上下文
         if hasattr(config.api, "max_history_rounds"):
             history_spin = QSpinBox()
-            history_spin.setRange(1, 50)
+            history_spin.setRange(1, 200)
             history_spin.setValue(config.api.max_history_rounds)
             history_spin.setStyleSheet(self.get_spin_style() + "color: #fff;")
             history_card = SettingCard("历史轮数", "上下文对话轮数（系统会保留最近多少轮对话内容作为上下文）", history_spin, "api.max_history_rounds")

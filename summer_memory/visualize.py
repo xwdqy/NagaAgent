@@ -52,7 +52,9 @@ def visualize_triples():
         net.write_html("graph.html")
 
         try:
-            webbrowser.open("graph.html")
+            # 获取正确的绝对路径
+            abs_html_path = os.path.abspath("graph.html")
+            webbrowser.open("file:///" + abs_html_path)
         except Exception as e:
             print(f"无法自动打开浏览器：{e}")
 

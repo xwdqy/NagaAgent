@@ -304,7 +304,7 @@ class NagaConversation: # 对话主类
         self.messages.append({"role": role, "content": content})
         
         # 限制历史消息数量，避免内存泄漏
-        max_messages = 20
+        max_messages = config.api.max_history_rounds * 2  # 每轮对话包含用户和助手各一条消息
         if len(self.messages) > max_messages:
             self.messages = self.messages[-max_messages:]
 
@@ -519,7 +519,9 @@ class NagaConversation: # 对话主类
             # 简化的消息拼接逻辑（UI界面使用）
             sysmsg = {"role": "system", "content": system_prompt.format(**services_text)}
             msgs = [sysmsg] if sysmsg else []
-            msgs += self.messages[-20:] + [{"role": "user", "content": u}]
+            # 使用配置文件中的历史轮数设置
+            max_history_messages = config.api.max_history_rounds * 2  # 每轮对话包含用户和助手各一条消息
+            msgs += self.messages[-max_history_messages:] + [{"role": "user", "content": u}]
 
             print(f"GTP请求发送：{now()}")  # AI请求前
             
