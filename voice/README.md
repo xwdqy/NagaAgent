@@ -12,8 +12,8 @@
 - **可选直接指定edge-tts语音**：既可用OpenAI语音映射，也可直接指定任意edge-tts语音
 - **HTTP和WebSocket双模式**：支持REST API和实时WebSocket连接
 
-### 🎯 流式TTS播放（参考MoeChat实现）
-- **智能标点符号分割**：参考MoeChat的标点符号分割算法，实时检测句子结束
+### 🎯 流式TTS播放（参考实现）
+- **智能标点符号分割**：参考的标点符号分割算法，实时检测句子结束
 - **括号计数**：智能处理嵌套括号，避免错误分割工具调用
 - **内存直接播放**：使用pygame库直接在内存中播放音频数据，无需创建临时文件
 - **并发音频合成**：支持多个音频片段并发申请API，提高处理速度
@@ -179,8 +179,8 @@ curl -X POST http://127.0.0.1:5050/v1/audio/speech \
 
 ### 测试流式TTS功能
 ```bash
-# 测试新的流式TTS实现（参考MoeChat）
-python voice/test_moechat_tts.py
+# 测试新的流式TTS实现（参考）
+python voice/test__tts.py
 
 # 测试基础播放功能
 python voice/test_audio_playback.py
@@ -285,7 +285,7 @@ logs/audio_temp/
 ## 📝 更新日志
 
 ### v3.1.0 - 流式TTS重构
-- ✅ 参考MoeChat的流式TTS实现
+- ✅ 参考的流式TTS实现
 - ✅ 标点符号分割算法优化
 - ✅ 括号计数避免错误分割
 - ✅ 内存中直接播放音频数据
