@@ -91,5 +91,8 @@ paho-mqtt>=2.0.0
 # 其他依赖
 python-docx>=1.2.0
 mqtt-tool>=0.1.1
+
+crawl4ai
 langchain_community
 langchain
+

@@ -12,7 +12,7 @@ import threading
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from voice.voice_integration import get_voice_integration
-from config import config
+from config import config, AI_NAME
 
 def test_moechat_tts():
     """测试新的流式TTS实现"""

@@ -6,7 +6,7 @@ from PyQt5.QtCore import Qt, QRect, QThread, pyqtSignal, QParallelAnimationGroup
 from PyQt5.QtGui import QColor, QPainter, QBrush, QFont, QPixmap, QPalette, QPen, QIcon
 from conversation_core import NagaConversation
 import os
-from config import config # 导入统一配置
+from config import config, AI_NAME # 导入统一配置
 from ui.response_utils import extract_message  # 新增：引入消息提取工具
 from ui.styles.progress_widget import EnhancedProgressWidget  # 导入进度组件
 from ui.enhanced_worker import StreamingWorker, BatchWorker  # 导入增强Worker
@@ -344,7 +344,7 @@ class ChatWindow(QWidget):
         s.img.setMaximumSize(16777215,16777215)
         s.img.setStyleSheet('background:transparent; border: none;')
         stack.addWidget(s.img)
-        nick=QLabel(f"● 娜迦{config.system.version}",s.side)
+        nick=QLabel(f"● {AI_NAME}{config.system.version}",s.side)
         nick.setStyleSheet("""
             QLabel {
                 color: #fff;
@@ -636,12 +636,12 @@ class ChatWindow(QWidget):
         # 实时更新显示 - 立即显示到UI
         if not hasattr(s, '_current_message_id'):
             # 第一次收到chunk时，创建新消息
-            s._current_message_id = s.add_user_message("娜迦", chunk)
+            s._current_message_id = s.add_user_message(AI_NAME, chunk)
             s.current_response = chunk
         else:
             # 后续chunk，追加到当前消息
             s.current_response += chunk
-            s.update_last_message("娜迦", s.current_response)
+            s.update_last_message(AI_NAME, s.current_response)
             
         # 强制UI更新
         s.chat_scroll_area.viewport().update()
@@ -655,10 +655,10 @@ class ChatWindow(QWidget):
             
             # 更新最终消息
             if hasattr(s, '_current_message_id'):
-                s.update_last_message("娜迦", final_message)
+                s.update_last_message(AI_NAME, final_message)
                 delattr(s, '_current_message_id')
             else:
-                s.add_user_message("娜迦", final_message)
+                s.add_user_message(AI_NAME, final_message)
         
         # 立即停止加载状态
         s.progress_widget.stop_loading()
@@ -671,7 +671,7 @@ class ChatWindow(QWidget):
         if not s.current_response:  # 如果流式没有收到数据，使用最终结果
             from ui.response_utils import extract_message
             final_message = extract_message(response)
-            s.add_user_message("娜迦", final_message)
+            s.add_user_message(AI_NAME, final_message)
         s.progress_widget.stop_loading()
     
     def on_batch_response_finished(s, response):
@@ -681,7 +681,7 @@ class ChatWindow(QWidget):
             return  # 不显示，因为已经在cancel_current_task中显示了
         from ui.response_utils import extract_message
         final_message = extract_message(response)
-        s.add_user_message("娜迦", final_message)
+        s.add_user_message(AI_NAME, final_message)
         s.progress_widget.stop_loading()
     
     def handle_error(s, error_msg):
@@ -1208,11 +1208,11 @@ class ChatWindow(QWidget):
                 s.progress_widget.stop_loading()
                 
                 if action == "read":
-                    s.add_user_message("娜迦", f"📖 文档内容:\n\n{result['content']}")
+                    s.add_user_message(AI_NAME, f"📖 文档内容:\n\n{result['content']}")
                 elif action == "analyze":
-                    s.add_user_message("娜迦", f"🔍 文档分析:\n\n{result['analysis']}")
+                    s.add_user_message(AI_NAME, f"🔍 文档分析:\n\n{result['analysis']}")
                 elif action == "summarize":
-                    s.add_user_message("娜迦", f"📝 文档摘要:\n\n{result['summary']}")
+                    s.add_user_message(AI_NAME, f"📝 文档摘要:\n\n{result['summary']}")
             else:
                 s.progress_widget.stop_loading()
                 s.add_user_message("系统", f"❌ 文档处理失败: {response.text}")
@@ -1231,46 +1231,40 @@ class ChatWindow(QWidget):
             graph_file = "logs/knowledge_graph/graph.html"
             quintuples_file = "logs/knowledge_graph/quintuples.json"
             
-            # 如果HTML文件不存在，尝试生成
-            if not os.path.exists(graph_file):
-                if os.path.exists(quintuples_file):
-                    # 有五元组数据，生成HTML
-                    s.add_user_message("系统", "🔄 正在生成心智云图...")
+            # 如果quintuples.json存在，删除现有的graph.html并重新生成
+            if os.path.exists(quintuples_file):
+                # 如果graph.html存在，先删除它
+                if os.path.exists(graph_file):
                     try:
-                        from summer_memory.quintuple_visualize_v2 import visualize_quintuples
-                        visualize_quintuples()
-                        if os.path.exists(graph_file):
-                            import webbrowser
-                            # 获取正确的绝对路径
-                            if os.path.isabs(graph_file):
-                                abs_graph_path = graph_file
-                            else:
-                                # 如果是相对路径，基于项目根目录构建绝对路径
-                                current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                                abs_graph_path = os.path.join(current_dir, graph_file)
-                            
-                            webbrowser.open("file:///" + abs_graph_path)
-                            s.add_user_message("系统", "🧠 心智云图已生成并打开")
-                        else:
-                            s.add_user_message("系统", "❌ 心智云图生成失败")
+                        os.remove(graph_file)
+                        print(f"已删除旧的graph.html文件")
                     except Exception as e:
-                        s.add_user_message("系统", f"❌ 生成心智云图失败: {str(e)}")
-                else:
-                    # 没有五元组数据，提示用户
-                    s.add_user_message("系统", "❌ 未找到五元组数据，请先进行对话以生成知识图谱")
-            else:
-                # HTML文件存在，直接打开
-                import webbrowser
-                # 获取正确的绝对路径
-                if os.path.isabs(graph_file):
-                    abs_graph_path = graph_file
-                else:
-                    # 如果是相对路径，基于项目根目录构建绝对路径
-                    current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                    abs_graph_path = os.path.join(current_dir, graph_file)
+                        print(f"删除graph.html文件失败: {e}")
                 
-                webbrowser.open("file:///" + abs_graph_path)
-                s.add_user_message("系统", "🧠 心智云图已打开")
+                # 生成新的HTML
+                s.add_user_message("系统", "🔄 正在生成心智云图...")
+                try:
+                    from summer_memory.quintuple_visualize_v2 import visualize_quintuples
+                    visualize_quintuples()
+                    if os.path.exists(graph_file):
+                        import webbrowser
+                        # 获取正确的绝对路径
+                        if os.path.isabs(graph_file):
+                            abs_graph_path = graph_file
+                        else:
+                            # 如果是相对路径，基于项目根目录构建绝对路径
+                            current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                            abs_graph_path = os.path.join(current_dir, graph_file)
+                        
+                        webbrowser.open("file:///" + abs_graph_path)
+                        s.add_user_message("系统", "🧠 心智云图已生成并打开")
+                    else:
+                        s.add_user_message("系统", "❌ 心智云图生成失败")
+                except Exception as e:
+                    s.add_user_message("系统", f"❌ 生成心智云图失败: {str(e)}")
+            else:
+                # 没有五元组数据，提示用户
+                s.add_user_message("系统", "❌ 未找到五元组数据，请先进行对话以生成知识图谱")
         except Exception as e:
             s.add_user_message("系统", f"❌ 打开心智云图失败: {str(e)}")
 

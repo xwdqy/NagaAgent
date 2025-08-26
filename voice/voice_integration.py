@@ -22,7 +22,7 @@ from queue import Queue, Empty
 
 # 添加项目根目录到Python路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from config import config
+from config import config, AI_NAME
 
 logger = logging.getLogger("VoiceIntegration")
 
@@ -64,6 +64,10 @@ class VoiceIntegration:
         self.audio_thread = threading.Thread(target=self._audio_player_worker, daemon=True)
         self.audio_thread.start()
         
+        # 启动音频处理工作线程（持续运行）
+        self.processing_thread = threading.Thread(target=self._audio_processing_worker, daemon=True)
+        self.processing_thread.start()
+        
         # 启动音频文件清理线程
         self.cleanup_thread = threading.Thread(target=self._audio_cleanup_worker, daemon=True)
         self.cleanup_thread.start()
@@ -101,6 +105,8 @@ class VoiceIntegration:
             
         if final_text and final_text.strip():
             logger.info(f"接收最终文本: {final_text[:100]}")
+            # 重置状态，为新的对话做准备
+            self.reset_processing_state()
             # 流式处理最终文本
             self._process_text_stream(final_text)
 
@@ -111,6 +117,7 @@ class VoiceIntegration:
             
         if text and text.strip():
             # 流式文本直接处理，不累积
+            logger.debug(f"接收文本片段: {text[:50]}...")
             self._process_text_stream(text.strip())
 
     def _process_text_stream(self, text: str):
@@ -142,11 +149,9 @@ class VoiceIntegration:
                 if sentence.strip():
                     # 加入句子队列
                     self.sentence_queue.put(sentence)
-                    logger.debug(f"处理句子: {sentence[:50]}...")
+                    logger.info(f"加入句子队列: {sentence[:50]}...")
                     
-                    # 启动音频合成线程（如果未启动）
-                    if not self.is_processing:
-                        self._start_audio_processing()
+                    # 音频处理线程始终在运行，无需检查启动状态
                 
                 # 更新缓冲区
                 self.text_buffer = self.text_buffer[end_pos:]
@@ -154,27 +159,44 @@ class VoiceIntegration:
         
     def _start_audio_processing(self):
         """启动音频处理线程"""
-        if self.is_processing:
-            return
-            
-        self.is_processing = True
-        threading.Thread(target=self._audio_processing_worker, daemon=True).start()
+        # 线程已经在初始化时启动，这里只需要设置状态
+        if not self.is_processing:
+            logger.debug("音频处理线程已启动，准备处理新的句子...")
+        # 线程会自动从队列中获取句子进行处理
+        
+    def reset_processing_state(self):
+        """重置处理状态，为新的对话做准备"""
+        # 清空队列
+        while not self.sentence_queue.empty():
+            try:
+                self.sentence_queue.get_nowait()
+            except Empty:
+                break
+                
+        while not self.audio_queue.empty():
+            try:
+                self.audio_queue.get_nowait()
+            except Empty:
+                break
+                
+        # 重置状态（不重置is_processing，因为线程是持续运行的）
+        self.text_buffer = ""
+        
+        logger.debug("语音处理状态已重置")
         
     def _audio_processing_worker(self):
-        """音频处理工作线程"""
+        """音频处理工作线程 - 持续运行"""
         logger.info("音频处理工作线程启动")
         
         try:
             while True:
                 try:
-                    # 从句子队列获取句子
-                    sentence = self.sentence_queue.get(timeout=1)
-                    
-                    if sentence == "DONE_DONE":
-                        # 处理完成
-                        self.audio_queue.put("DONE_DONE")
-                        break
+                    # 从句子队列获取句子，增加超时时间
+                    sentence = self.sentence_queue.get(timeout=10)
                         
+                    # 设置处理状态
+                    self.is_processing = True
+                    
                     # 生成音频
                     audio_data = self._generate_audio_sync(sentence)
                     if audio_data:
@@ -189,12 +211,14 @@ class VoiceIntegration:
                         # 还有未处理的文本，继续等待
                         continue
                     else:
-                        # 没有更多文本，发送完成信号
-                        self.audio_queue.put("DONE_DONE")
-                        break
+                        # 没有更多文本，继续等待新的句子
+                        logger.debug("音频处理线程等待新的句子...")
+                        self.is_processing = False
+                        continue
                         
         except Exception as e:
             logger.error(f"音频处理工作线程错误: {e}")
+            self.is_processing = False
         finally:
             self.is_processing = False
             logger.info("音频处理工作线程结束")
@@ -268,12 +292,8 @@ class VoiceIntegration:
         try:
             while True:
                 try:
-                    # 从队列获取音频数据
-                    audio_data = self.audio_queue.get(timeout=10)  # 10秒超时
-                    
-                    if audio_data == "DONE_DONE":
-                        logger.info("音频播放完成")
-                        break
+                    # 从队列获取音频数据，增加超时时间
+                    audio_data = self.audio_queue.get(timeout=30)  # 增加到30秒超时
                         
                     if audio_data:
                         # 播放音频数据
@@ -281,6 +301,7 @@ class VoiceIntegration:
                         
                 except Empty:
                     # 队列为空，继续等待
+                    logger.debug("音频队列为空，继续等待...")
                     continue
                 except Exception as e:
                     logger.error(f"音频播放工作线程错误: {e}")
@@ -301,6 +322,11 @@ class VoiceIntegration:
             import pygame
             import io
             import time
+            
+            # 检查pygame是否初始化
+            if not pygame.mixer.get_init():
+                logger.warning("pygame mixer未初始化，尝试重新初始化")
+                pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
             
             # 停止当前正在播放的音频
             if pygame.mixer.music.get_busy():
@@ -326,6 +352,12 @@ class VoiceIntegration:
             
         except Exception as e:
             logger.error(f"播放音频数据失败: {e}")
+            # 尝试重新初始化pygame
+            try:
+                pygame.mixer.quit()
+                pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
+            except:
+                pass
 
     def _audio_cleanup_worker(self):
         """音频文件清理工作线程"""
@@ -372,8 +404,9 @@ class VoiceIntegration:
                 self.sentence_queue.put(remaining_text)
                 logger.debug(f"处理剩余文本: {remaining_text[:50]}...")
         
-        # 发送完成信号
-        self.sentence_queue.put("DONE_DONE")
+        # 不再发送完成信号，因为线程是持续运行的
+        # 只需要清空文本缓冲区
+        self.text_buffer = ""
 
     def get_debug_info(self) -> Dict[str, Any]:
         """获取调试信息"""
