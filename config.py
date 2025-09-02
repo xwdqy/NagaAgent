@@ -135,6 +135,23 @@ class TTSConfig(BaseModel):
     expand_api: bool = Field(default=True, description="是否扩展API")
     require_api_key: bool = Field(default=False, description="是否需要API密钥")
 
+class ASRConfig(BaseModel):
+    """ASR输入服务配置"""
+    port: int = Field(default=5060, ge=1, le=65535, description="ASR服务端口")
+    device_index: int | None = Field(default=None, description="麦克风设备序号")
+    sample_rate_in: int = Field(default=48000, description="输入采样率")
+    frame_ms: int = Field(default=30, description="分帧时长ms")
+    resample_to: int = Field(default=16000, description="重采样目标采样率")
+    vad_threshold: float = Field(default=0.7, ge=0.0, le=1.0, description="VAD阈值")
+    silence_ms: int = Field(default=420, description="静音结束阈值ms")
+    noise_reduce: bool = Field(default=True, description="是否降噪")
+    engine: str = Field(default="local_funasr", description="ASR引擎，仅支持local_funasr")
+    local_model_path: str = Field(default="./utilss/models/SenseVoiceSmall", description="本地FunASR模型路径")
+    vad_model_path: str = Field(default="silero_vad.onnx", description="VAD模型路径")
+    api_key_required: bool = Field(default=False, description="是否需要API密钥")
+    callback_url: str | None = Field(default=None, description="识别结果回调地址")
+    ws_broadcast: bool = Field(default=False, description="是否WS广播结果")
+
 class FilterConfig(BaseModel):
     """输出过滤配置"""
     filter_think_tags: bool = Field(default=True, description="过滤思考标签内容")
@@ -319,6 +336,7 @@ class NagaConfig(BaseModel):
     handoff: HandoffConfig = Field(default_factory=HandoffConfig)
     browser: BrowserConfig = Field(default_factory=BrowserConfig)
     tts: TTSConfig = Field(default_factory=TTSConfig)
+    asr: ASRConfig = Field(default_factory=ASRConfig)  # ASR输入服务配置 #
     filter: FilterConfig = Field(default_factory=FilterConfig)
     difficulty: DifficultyConfig = Field(default_factory=DifficultyConfig)
     scoring: ScoringConfig = Field(default_factory=ScoringConfig)

@@ -389,7 +389,7 @@ async def chat_stream(request: ChatRequest):
             voice_integration = None
             if config.system.voice_enabled:
                 try:
-                    from voice.voice_integration import get_voice_integration
+                    from voice.output.voice_integration import get_voice_integration
                     voice_integration = get_voice_integration()
                 except Exception as e:
                     print(f"语音集成初始化失败: {e}")

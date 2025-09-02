@@ -29,7 +29,7 @@ class EnhancedWorker(QThread):
         
         # 初始化语音集成模块
         try:
-            from voice.voice_integration import get_voice_integration
+            from voice.output.voice_integration import get_voice_integration
             self.voice_integration = get_voice_integration()
         except Exception as e:
             print(f"语音集成初始化失败: {e}")

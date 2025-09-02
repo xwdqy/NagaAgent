@@ -23,54 +23,74 @@ class AppLauncherAgent(object):
     async def handle_handoff(self, data: dict) -> str:
         """
         MCP标准接口，处理handoff请求
-        智能应用启动：如果不提供app参数则返回应用列表，如果提供则启动应用
+        支持两个独立工具：获取应用列表 和 启动应用
         """
         try:
+            print(f"🔧 AppLauncherAgent.handle_handoff 收到请求: {data}")
+            
             tool_name = data.get("tool_name")
             if not tool_name:
-                return json.dumps({"success": False, "status": "error", "message": "缺少tool_name参数", "data": {}}, ensure_ascii=False)
+                error_msg = "缺少tool_name参数"
+                print(f"❌ {error_msg}")
+                return json.dumps({"success": False, "status": "error", "message": error_msg, "data": {}}, ensure_ascii=False)
             
-            if tool_name == "启动应用":
-                # 智能应用启动工具 - 两轮交互逻辑 #
-                app = data.get("app")
+            if tool_name == "获取应用列表":
+                # 获取应用列表工具
+                print("📋 获取应用列表")
+                result = await self._get_apps_list()
+                print(f"✅ 获取应用列表完成，返回 {result.get('data', {}).get('total_count', 0)} 个应用")
+                return json.dumps(result, ensure_ascii=False)
+                
+            elif tool_name == "启动应用":
+                # 启动应用工具
+                app = data.get("app") or data.get("app_name")
                 args = data.get("args")
                 
-                if not app:
-                    # 第一轮：LLM请求启动应用，直接返回应用列表供选择 #
-                    result = await self._get_apps_list()
-                else:
-                    # 第二轮：LLM提供应用名称，启动指定应用 #
-                    result = await self._open_app(app, args)
+                print(f"🔍 启动应用参数: app={app}, args={args}")
                 
+                if not app:
+                    error_msg = "启动应用需要提供app参数"
+                    print(f"❌ {error_msg}")
+                    return json.dumps({"success": False, "status": "error", "message": error_msg, "data": {}}, ensure_ascii=False)
+                
+                print(f"🚀 启动应用 '{app}'")
+                result = await self._open_app(app, args)
+                print(f"✅ 启动应用完成，结果: {result}")
                 return json.dumps(result, ensure_ascii=False)
             
             else:
-                return json.dumps({"success": False, "status": "error", "message": f"未知操作: {tool_name}", "data": {}}, ensure_ascii=False)
+                error_msg = f"未知工具: {tool_name}。可用工具：获取应用列表、启动应用"
+                print(f"❌ {error_msg}")
+                return json.dumps({"success": False, "status": "error", "message": error_msg, "data": {}}, ensure_ascii=False)
                 
         except Exception as e:
-            return json.dumps({"success": False, "status": "error", "message": str(e), "data": {}}, ensure_ascii=False)
+            error_msg = f"handle_handoff异常: {str(e)}"
+            print(f"❌ {error_msg}")
+            import traceback
+            traceback.print_exc()
+            return json.dumps({"success": False, "status": "error", "message": error_msg, "data": {}}, ensure_ascii=False)
 
     async def _get_apps_list(self) -> dict:
-        """第一轮交互：异步获取应用列表供LLM选择 #"""
+        """获取应用列表工具 - 返回可用应用列表供用户选择"""
         try:
             app_info = await self.scanner.get_app_info_for_llm()
             
             return {
                 "success": True,
                 "status": "apps_ready",
-                "message": f"✅ 已获取到 {app_info['total_count']} 个可用应用。请从下方列表中选择要启动的应用，然后使用以下格式进行第二次调用：",
+                "message": f"✅ 已获取到 {app_info['total_count']} 个可用应用。请从下方列表中选择要启动的应用，然后使用启动应用工具。",
                 "data": {
                     "total_count": app_info['total_count'],
-                    "apps": app_info['apps'],
-                    "application_format": {
-                        "tool_name": "启动应用",
-                        "app": "应用名称（必填，从上述列表中选择）",
-                        "args": "启动参数（可选）"
-                    },
-                    "example": {
-                        "tool_name": "启动应用",
-                        "app": "Chrome",
-                        "args": ""
+                    "apps": app_info['apps'][:30],  # 只显示前30个，避免列表过长
+                    "usage_instructions": {
+                        "step1": "从上述应用列表中选择要启动的应用名称",
+                        "step2": "使用启动应用工具，格式如下：",
+                        "example": {
+                            "tool_name": "启动应用",
+                            "app": "Chrome",
+                            "args": ""  # 可选参数
+                        },
+                        "note": "应用名称必须完全匹配列表中的名称"
                     }
                 }
             }

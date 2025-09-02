@@ -64,9 +64,11 @@ soundfile>=0.12.1
 pyaudio>=0.2.14
 edge-tts>=7.0.2
 emoji>=2.8.0
+noisereduce>=3.0.0
 
 # 语音识别相关依赖
 winrt-runtime>=3.2.1
+onnxruntime>=1.16.0
 
 # 系统托盘相关依赖
 pystray>=0.19.4

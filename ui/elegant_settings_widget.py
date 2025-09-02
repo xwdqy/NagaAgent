@@ -276,6 +276,19 @@ class ElegantSettingsWidget(QWidget):
         self.setup_ui()
         self.load_current_settings()
         
+        # 添加配置变更监听器，实现实时更新
+        from config import add_config_listener
+        add_config_listener(self.on_config_reloaded)
+        
+    def on_config_reloaded(self):
+        """配置重新加载后的处理"""
+        # 重新加载当前设置到界面
+        self.load_current_settings()
+        # 清空待保存的更改
+        self.pending_changes.clear()
+        # 更新状态标签
+        self.update_status_label("✓ 配置已重新加载，界面已更新")
+        
     def setup_ui(self):
         """初始化UI"""
         main_layout = QVBoxLayout(self)
@@ -854,30 +867,53 @@ class ElegantSettingsWidget(QWidget):
         """加载当前设置"""
         try:
             # API设置 - 优先从.env文件读取API密钥
-            env_api_key = self.read_api_key_from_env()
-            if env_api_key:
-                self.api_key_input.setText(env_api_key)
-            else:
-                self.api_key_input.setText(config.api.api_key if config.api.api_key != "sk-placeholder-key-not-set" else "")
+            if hasattr(self, 'api_key_input'):
+                env_api_key = self.read_api_key_from_env()
+                if env_api_key:
+                    self.api_key_input.setText(env_api_key)
+                else:
+                    self.api_key_input.setText(config.api.api_key if config.api.api_key != "sk-placeholder-key-not-set" else "")
             
-            self.base_url_input.setText(config.api.base_url)
+            if hasattr(self, 'base_url_input'):
+                self.base_url_input.setText(config.api.base_url)
             
-            index = self.model_combo.findText(config.api.model)
-            if index >= 0:
-                self.model_combo.setCurrentIndex(index)
-                
+            if hasattr(self, 'model_combo'):
+                index = self.model_combo.findText(config.api.model)
+                if index >= 0:
+                    self.model_combo.setCurrentIndex(index)
+                    
             # 系统设置
-            self.temp_slider.setValue(int(config.api.temperature * 100))
-            self.max_tokens_spin.setValue(config.api.max_tokens)
-            self.history_spin.setValue(config.api.max_history_rounds)
+            if hasattr(self, 'temp_slider'):
+                self.temp_slider.setValue(int(config.api.temperature * 100))
+            if hasattr(self, 'max_tokens_spin'):
+                self.max_tokens_spin.setValue(config.api.max_tokens)
+            if hasattr(self, 'history_spin'):
+                self.history_spin.setValue(config.api.max_history_rounds)
+            if hasattr(self, 'persistent_context_checkbox'):
+                self.persistent_context_checkbox.setChecked(config.api.persistent_context)
+            if hasattr(self, 'context_days_spin'):
+                self.context_days_spin.setValue(config.api.context_load_days)
             
             # 界面设置
-            self.voice_checkbox.setChecked(config.system.voice_enabled)
+            if hasattr(self, 'voice_checkbox'):
+                self.voice_checkbox.setChecked(config.system.voice_enabled)
+            if hasattr(self, 'debug_checkbox'):
+                self.debug_checkbox.setChecked(config.system.debug)
+            if hasattr(self, 'log_combo'):
+                index = self.log_combo.findText(config.system.log_level)
+                if index >= 0:
+                    self.log_combo.setCurrentIndex(index)
             
             # 高级设置
-            self.debug_checkbox.setChecked(config.system.debug)
-            self.sim_slider.setValue(int(config.grag.similarity_threshold * 100))
-            
+            if hasattr(self, 'sim_slider'):
+                self.sim_slider.setValue(int(config.grag.similarity_threshold * 100))
+            if hasattr(self, 'alpha_slider'):
+                self.alpha_slider.setValue(int(config.ui.bg_alpha * 100))
+            if hasattr(self, 'window_bg_spin'):
+                self.window_bg_spin.setValue(config.ui.window_bg_alpha)
+            if hasattr(self, 'user_name_input'):
+                self.user_name_input.setText(config.ui.user_name)
+                
         except Exception as e:
             print(f"加载设置失败: {e}")
     
@@ -919,63 +955,30 @@ class ElegantSettingsWidget(QWidget):
                 self.update_status_label("● 没有需要保存的更改")
                 return
             
-            # 加载当前config.json
-            config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.json')
-            
-            try:
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config_data = json.load(f)
-            except Exception:
-                config_data = {}
-            
-            success_count = 0
-            
-            # 更新配置数据
-            for setting_key, value in self.pending_changes.items():
-                try:
-                    # 特殊处理API密钥
-                    if setting_key == 'api.api_key':
-                        # 同时写入.env文件和config.json
-                        self.write_api_key_to_env(value)
-                    
-                    # 解析嵌套的配置键 (例如 "api.api_key")
-                    keys = setting_key.split('.')
-                    current = config_data
-                    
-                    # 导航到父级
-                    for key in keys[:-1]:
-                        if key not in current:
-                            current[key] = {}
-                        current = current[key]
-                    
-                    # 设置值
-                    final_key = keys[-1]
-                    if setting_key in ['api.temperature', 'grag.similarity_threshold', 'ui.bg_alpha']:
-                        # 温度、相似度、透明度值从0-100转换为0.0-1.0
-                        current[final_key] = value / 100.0
-                    else:
-                        current[final_key] = value
-                    
-                    success_count += 1
-                        
-                except Exception as e:
-                    print(f"保存设置 {setting_key} 失败: {e}")
-            
-            # 保存到config.json
-            with open(config_path, 'w', encoding='utf-8') as f:
-                json.dump(config_data, f, ensure_ascii=False, indent=2)
-            
-            # 使用配置管理器进行热更新
+            # 使用配置管理器进行统一的配置更新
             from config_manager import update_config
             # 将扁平化的配置键值对转换为嵌套字典格式
             nested_updates = self._convert_to_nested_updates(self.pending_changes)
+            
+            # 特殊处理API密钥 - 先写入.env文件
+            if 'api.api_key' in self.pending_changes:
+                self.write_api_key_to_env(self.pending_changes['api.api_key'])
+            
+            # 通过配置管理器更新配置（会自动写入config.json并触发热更新）
             success = update_config(nested_updates)
             if not success:
                 self.update_status_label("✗ 配置更新失败")
                 return
                     
-            self.update_status_label(f"✓ 已保存 {success_count}/{changes_count} 项设置")
+            self.update_status_label(f"✓ 已保存 {changes_count}/{changes_count} 项设置")
             self.pending_changes.clear()
+            
+            # 等待配置重新加载完成
+            import time
+            time.sleep(0.2)
+            
+            # 重新加载设置到界面，确保显示最新值
+            self.load_current_settings()
             
             # 发送设置变化信号
             self.settings_changed.emit("all", None)

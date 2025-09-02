@@ -21,17 +21,22 @@
   "capabilities": {
     "invocationCommands": [
       {
+        "command": "获取应用列表",
+        "description": "获取系统中可用的应用列表，供用户选择要启动的应用",
+        "example": "{\"tool_name\":\"获取应用列表\"}"
+      },
+      {
         "command": "启动应用",
-        "description": "智能应用启动工具。两轮交互：1)第一轮调用获取应用列表，2)第二轮提供应用名称启动应用。",
-        "example": "{\"tool_name\":\"启动应用\"}"
+        "description": "启动指定的应用程序，需要提供应用名称",
+        "example": "{\"tool_name\":\"启动应用\",\"app\":\"Chrome\"}"
       }
     ]
   },
   "inputSchema": {
     "type": "object",
     "properties": {
-      "tool_name": {"type": "string", "description": "工具名称：启动应用"},
-      "app": {"type": "string", "description": "应用名称（可选）。第一轮调用时不提供此参数以获取应用列表，第二轮调用时提供从列表中选定的应用名称"},
+      "tool_name": {"type": "string", "description": "工具名称：获取应用列表 或 启动应用"},
+      "app": {"type": "string", "description": "应用名称（仅在启动应用时必填）"},
       "args": {"type": "string", "description": "启动参数（可选）"}
     },
     "required": ["tool_name"]

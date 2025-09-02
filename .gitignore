@@ -8,10 +8,6 @@ __pycache__/
 dist/
 build/
 
-# 日志文件
-logs/
-*.log
-
 # 环境变量
 .env
 
@@ -37,6 +33,3 @@ Thumbs.db
 *.tmp
 *.temp
 uv.lock
-
-# 配置文件
-config.json

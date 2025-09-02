@@ -132,7 +132,7 @@ def _check_and_queue_sentences(self):
 
 #### 基本使用
 ```python
-from voice.voice_integration import get_voice_integration
+from voice.output.voice_integration import get_voice_integration
 
 # 获取语音集成实例
 voice_integration = get_voice_integration()
@@ -315,6 +315,41 @@ logs/audio_temp/
 ## 🎙️ 语音示例
 
 [试听语音样例及全部Edge TTS语音](https://tts.travisvn.com/)
+
+## 🎤 语音输入服务
+
+### 概述
+语音输入服务是 NagaAgent 的独立语音识别模块，基于 MoeChat 的 Silero VAD 技术和本地 FunASR 引擎，提供高质量的语音转文本功能。
+
+### 核心特性
+- **本地麦克风采集**：实时音频采集与处理
+- **Silero VAD 端点检测**：准确的语音活动检测
+- **本地 FunASR 识别**：基于 ModelScope 的离线语音识别
+- **HTTP REST API**：OpenAI 兼容的转写接口
+- **WebSocket 实时识别**：实时 VAD + ASR 推送
+- **设备管理**：自动检测和选择音频设备
+
+### 快速启动
+```bash
+# 安装依赖
+pip install -r voice/input/requirements.txt
+
+# 启动服务
+python voice/input/start_input_service.py
+
+# 检查依赖
+python voice/input/start_input_service.py --check-deps
+```
+
+### 主要接口
+- `POST /v1/audio/transcriptions` - 文件转写
+- `POST /v1/audio/transcriptions_b64` - Base64 转写
+- `GET /devices` - 音频设备列表
+- `POST /control/listen/start|stop` - 本地监听控制
+- `ws://127.0.0.1:5060/v1/audio/asr_ws` - 实时识别
+
+### 详细文档
+更多信息请参考：[voice/input/README.md](input/README.md)
 
 ## 📄 许可证
 

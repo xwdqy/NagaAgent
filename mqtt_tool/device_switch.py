@@ -15,6 +15,66 @@ if sys.platform == 'win32':
     sys.stderr.reconfigure(encoding='utf-8')
     sys.stdout.reconfigure(encoding='utf-8')
 
+class MQTTJsonStandardizer:
+    """MQTT JSON标准化工具类，确保发送的JSON只包含ASCII字符"""
+    
+    @staticmethod
+    def standardize_device_control(device1: int, device2: int, device3: int) -> str:
+        """
+        标准化设备控制JSON格式
+        返回标准ASCII JSON字符串，确保物联网设备能正确解析
+        """
+        payload = {
+            "device1": int(device1),
+            "device2": int(device2), 
+            "device3": int(device3),
+            "timestamp": int(time.time()),
+        }
+        
+        # 强制使用ASCII编码，移除空格，使用紧凑格式
+        return json.dumps(payload, ensure_ascii=True, separators=(',', ':'))
+    
+    @staticmethod
+    def standardize_status_query() -> str:
+        """标准化状态查询JSON格式"""
+        payload = {
+            "cmd": "status",
+            "timestamp": int(time.time()),
+            "ver": "1.0"
+        }
+        return json.dumps(payload, ensure_ascii=True, separators=(',', ':'))
+    
+    @staticmethod
+    def standardize_heartbeat() -> str:
+        """标准化心跳包JSON格式"""
+        payload = {
+            "cmd": "heartbeat",
+            "timestamp": int(time.time()),
+            "ver": "1.0"
+        }
+        return json.dumps(payload, ensure_ascii=True, separators=(',', ':'))
+    
+    @staticmethod
+    def validate_json_format(json_str: str) -> bool:
+        """验证JSON格式是否符合标准"""
+        try:
+            # 尝试解析JSON
+            data = json.loads(json_str)
+            
+            # 检查必要字段
+            required_fields = ['cmd', 'timestamp', 'ver']
+            for field in required_fields:
+                if field not in data:
+                    return False
+            
+            # 检查时间戳是否为整数
+            if not isinstance(data['timestamp'], int):
+                return False
+                
+            return True
+        except (json.JSONDecodeError, TypeError):
+            return False
+
 # 从config模块读取MQTT配置
 def load_mqtt_config():
     """从config模块加载MQTT配置"""
@@ -286,24 +346,17 @@ class DeviceSwitchManager:
                 logger.debug("MQTT已连接，跳过连接步骤")
             
             try:
-                payload = {
-                    "device1": int(device1),
-                    "device2": int(device2),
-                    "device3": int(device3),
-                    "timestamp": time.time()
-                }
+                # 使用标准化工具创建JSON
+                payload_str = MQTTJsonStandardizer.standardize_device_control(device1, device2, device3)
+                payload_bytes = payload_str.encode('ascii')
                 
-                try:
-                    payload_str = json.dumps(payload, ensure_ascii=False)
-                    payload_bytes = payload_str.encode('utf-8')
-                except UnicodeEncodeError:
-                    payload_str = json.dumps(payload, ensure_ascii=True)
-                    payload_bytes = payload_str.encode('ascii')
+                # 记录发送的标准化JSON
+                logger.info(f"发送标准化MQTT消息: {payload_str}")
                 
                 result = self.client.publish(mqtt_config['topic'], payload_bytes)
                 
                 if result.rc == mqtt.MQTT_ERR_SUCCESS:
-                    logger.info(f"已发送设备控制命令: {payload}")
+                    logger.info(f"已发送设备控制命令: device1={device1}, device2={device2}, device3={device3}")
                     return True, "命令已发送"
                 else:
                     return False, f"发送失败，错误代码: {result.rc}"
