@@ -238,6 +238,15 @@ class UIConfig(BaseModel):
     mac_btn_gap: int = Field(default=12, ge=0, le=30, description="Mac按钮间距")
     animation_duration: int = Field(default=600, ge=100, le=2000, description="动画时长（毫秒）")
 
+class Live2DConfig(BaseModel):
+    """Live2D配置"""
+    enabled: bool = Field(default=False, description="是否启用Live2D功能")
+    model_path: str = Field(default="", description="Live2D模型文件路径")
+    fallback_image: str = Field(default="ui/standby.png", description="回退图片路径")
+    auto_switch: bool = Field(default=True, description="是否自动切换模式")
+    animation_enabled: bool = Field(default=True, description="是否启用动画")
+    touch_interaction: bool = Field(default=True, description="是否启用触摸交互")
+
 class NagaPortalConfig(BaseModel):
     """娜迦官网账户配置"""
     portal_url: str = Field(default="https://naga.furina.chat/", description="娜迦官网地址")
@@ -345,6 +354,7 @@ class NagaConfig(BaseModel):
     weather: WeatherConfig = Field(default_factory=WeatherConfig)
     mqtt: MQTTConfig = Field(default_factory=MQTTConfig)
     ui: UIConfig = Field(default_factory=UIConfig)
+    live2d: Live2DConfig = Field(default_factory=Live2DConfig)
     naga_portal: NagaPortalConfig = Field(default_factory=NagaPortalConfig)
     online_search: OnlineSearchConfig = Field(default_factory=OnlineSearchConfig)
 

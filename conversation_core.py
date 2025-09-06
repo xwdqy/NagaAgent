@@ -98,11 +98,12 @@ class NagaConversation: # 对话主类
         self.voice = None
         if config.system.voice_enabled:
             try:
-                # 语音功能已迁移到voice_integration.py，由ui/enhanced_worker.py调用
-                # 不再需要在这里初始化VoiceHandler
+                # 语音功能已分为语音输入和输出两个独立模块
+                # 语音输入：负责语音识别（ASR）和VAD
+                # 语音输出：负责文本转语音（TTS）
                 # 使用全局变量避免重复输出日志
                 if not SystemState._voice_enabled_logged:
-                    logger.info("语音功能已启用，由UI层管理")
+                    logger.info("语音功能已启用（语音输入+输出），由UI层管理")
                     SystemState._voice_enabled_logged = True
             except Exception as e:
                 logger.warning(f"语音系统初始化失败: {e}")
@@ -177,7 +178,7 @@ class NagaConversation: # 对话主类
             # 异步启动NagaPortal自动登录
             self._start_naga_portal_auto_login()
             
-            # 异步启动MQTT连接状态检查
+            # 异步启动物联网通讯连接状态检查
             self._start_mqtt_status_check()
         except Exception as e:
             logger.error(f"MCP服务系统初始化失败: {e}")
@@ -273,13 +274,13 @@ class NagaConversation: # 对话主类
             print(f"🍪 NagaPortal状态获取失败: {e}")
     
     def _start_mqtt_status_check(self):
-        """启动MQTT连接并显示状态（异步）"""
+        """启动物联网通讯连接并显示状态（异步）"""
         try:
-            # 检查是否配置了MQTT
+            # 检查是否配置了物联网通讯
             if not config.mqtt.enabled:
                 return  # 静默跳过，不输出日志
             
-            # 在新线程中异步执行MQTT连接
+            # 在新线程中异步执行物联网通讯连接
             def run_mqtt_connection():
                 try:
                     import sys
@@ -292,21 +293,21 @@ class NagaConversation: # 对话主类
                     try:
                         from mqtt_tool.device_switch import device_manager
                         
-                        # 尝试连接MQTT
+                        # 尝试连接物联网设备
                         if hasattr(device_manager, 'connect'):
                             success = device_manager.connect()
                             if success:
-                                print("🔗 MQTT连接状态: 已连接")
+                                print("🔗 物联网通讯状态: 已连接")
                             else:
-                                print("⚠️ MQTT连接状态: 连接失败（将在使用时重试）")
+                                print("⚠️ 物联网通讯状态: 连接失败（将在使用时重试）")
                         else:
-                            print("❌ MQTT功能不可用")
+                            print("❌ 物联网通讯功能不可用")
                             
                     except Exception as e:
-                        print(f"⚠️ MQTT连接失败: {e}")
+                        print(f"⚠️ 物联网通讯连接失败: {e}")
                         
                 except Exception as e:
-                    print(f"❌ MQTT连接异常: {e}")
+                    print(f"❌ 物联网通讯连接异常: {e}")
             
             # 启动后台线程
             import threading
@@ -314,7 +315,7 @@ class NagaConversation: # 对话主类
             mqtt_thread.start()
             
         except Exception as e:
-            print(f"❌ MQTT连接启动失败: {e}")
+            print(f"❌ 物联网通讯连接启动失败: {e}")
     
     def save_log(self, u, a):  # 保存对话日志
         if self.dev_mode:
@@ -706,7 +707,11 @@ class NagaConversation: # 对话主类
                 
             except Exception as e:
                 print(f"工具调用循环失败: {e}")
-                yield (AI_NAME, f"[MCP异常]: {e}")
+                # 区分API错误和MCP错误
+                if "API" in str(e) or "api" in str(e) or "HTTP" in str(e) or "连接" in str(e):
+                    yield (AI_NAME, f"[API调用异常]: {e}")
+                else:
+                    yield (AI_NAME, f"[MCP服务异常]: {e}")
                 return
 
             return
@@ -714,7 +719,11 @@ class NagaConversation: # 对话主类
             import sys
             import traceback
             traceback.print_exc(file=sys.stderr)
-            yield (AI_NAME, f"[MCP异常]: {e}")
+            # 区分API错误和MCP错误
+            if "API" in str(e) or "api" in str(e) or "HTTP" in str(e) or "连接" in str(e):
+                yield (AI_NAME, f"[API调用异常]: {e}")
+            else:
+                yield (AI_NAME, f"[MCP服务异常]: {e}")
             return
 
     async def get_response(self, prompt: str, temperature: float = 0.7) -> str:

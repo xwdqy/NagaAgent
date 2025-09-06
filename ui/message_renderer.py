@@ -151,6 +151,7 @@ class ToolCallDialog(QFrame):
         layout.setSpacing(5)
         
         # 工具调用提示标签
+        self.tool_call_label = QLabel("工具调用检测中...")
         self.tool_call_label.setStyleSheet("""
             QLabel {
                 color: #888;
@@ -450,6 +451,53 @@ class MessageRenderer:
     def create_system_message(name, content, parent):
         """创建系统消息对话框"""
         return MessageDialog(name, content, parent)
+    
+    @staticmethod
+    def create_history_message(name, content, parent):
+        """创建历史消息对话框 - 用于加载持久化上下文"""
+        return MessageDialog(name, content, parent)
+    
+    @staticmethod
+    def batch_create_history_messages(history_messages, parent_widget):
+        """
+        批量创建历史消息对话框
+        
+        Args:
+            history_messages: 历史消息列表，格式为[{"role": "user/assistant", "content": "内容"}]
+            parent_widget: 父级容器widget
+            
+        Returns:
+            List: 创建的消息对话框列表
+        """
+        dialogs = []
+        
+        for msg in history_messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            
+            if role == "user":
+                # 从配置获取用户名
+                try:
+                    from config import config
+                    user_name = config.ui.user_name
+                except ImportError:
+                    user_name = "用户"
+                dialog = MessageRenderer.create_user_message(user_name, content, parent_widget)
+            elif role == "assistant":
+                # 从配置获取AI名称
+                try:
+                    from config import config
+                    ai_name = config.system.ai_name
+                except ImportError:
+                    ai_name = "娜迦"
+                dialog = MessageRenderer.create_assistant_message(ai_name, content, parent_widget)
+            else:
+                # 其他角色使用系统消息样式
+                dialog = MessageRenderer.create_system_message(role, content, parent_widget)
+            
+            dialogs.append(dialog)
+        
+        return dialogs
     
     @staticmethod
     def update_message_content(dialog, new_content):

@@ -119,13 +119,13 @@ class ServiceManager:
             print(f"❌ API服务器启动异常: {e}")
     
     def start_tts_server(self):
-        """启动TTS服务"""
+        """启动语音输出服务（TTS）"""
         try:
             if not self.check_port_available("0.0.0.0", config.tts.port):
-                print(f"⚠️ 端口 {config.tts.port} 已被占用，跳过TTS服务启动")
+                print(f"⚠️ 端口 {config.tts.port} 已被占用，跳过语音输出服务启动")
                 return
             
-            print("🚀 正在启动TTS服务...")
+            print("🚀 正在启动语音输出服务...")
             print(f"📍 地址: http://127.0.0.1:{config.tts.port}")
             
             def run_tts():
@@ -133,14 +133,14 @@ class ServiceManager:
                     from voice.output.start_voice_service import start_http_server
                     start_http_server()
                 except Exception as e:
-                    print(f"❌ TTS服务启动失败: {e}")
+                    print(f"❌ 语音输出服务启动失败: {e}")
             
             self.tts_thread = threading.Thread(target=run_tts, daemon=True)
             self.tts_thread.start()
-            print("✅ TTS服务已在后台启动")
+            print("✅ 语音输出服务已在后台启动")
             time.sleep(1)
         except Exception as e:
-            print(f"❌ TTS服务启动异常: {e}")
+            print(f"❌ 语音输出服务启动异常: {e}")
     
     def show_naga_portal_status(self):
         """显示NagaPortal配置状态（手动调用）"""
@@ -225,8 +225,8 @@ if config.api_server.enabled and config.api_server.auto_start:
 
 service_manager.start_tts_server()
 
-# MQTT连接已在后台异步执行，连接完成后会自动显示状态
-print("⏳ MQTT正在后台初始化连接...")
+# 物联网通讯连接已在后台异步执行，连接完成后会自动显示状态
+print("⏳ 物联网通讯正在后台初始化连接...")
 
 # NagaPortal自动登录已在后台异步执行，登录完成后会自动显示状态
 print("⏳ NagaPortal正在后台自动登录...")

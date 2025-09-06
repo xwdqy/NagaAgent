@@ -39,8 +39,11 @@ class LogContextParser:
         try:
             from config import config
             self.ai_name = config.system.ai_name
+            # 从配置读取持久化上下文相关参数
+            self.context_load_days = config.api.context_load_days
         except ImportError:
             self.ai_name = "娜迦"
+            self.context_load_days = 3  # 默认值
     
     def _parse_log_line(self, line: str) -> Optional[tuple]:
         """
@@ -183,6 +186,67 @@ class LogContextParser:
             "assistant_messages": assistant_messages,
             "days_covered": days
         }
+    
+    def load_persistent_context_to_ui(self, parent_widget, max_messages: int = None) -> List[tuple]:
+        """
+        将持久化上下文加载到前端UI
+        
+        Args:
+            parent_widget: 父级容器widget
+            max_messages: 最大消息数量限制
+            
+        Returns:
+            List[tuple]: 返回(消息ID, 消息信息, 对话框组件)的元组列表
+        """
+        try:
+            # 计算最大消息数量
+            if max_messages is None:
+                try:
+                    from config import config
+                    max_messages = config.api.max_history_rounds * 2
+                except ImportError:
+                    max_messages = 20  # 默认值
+            
+            # 加载历史对话
+            recent_messages = self.load_recent_context(
+                days=self.context_load_days,
+                max_messages=max_messages
+            )
+            
+            if not recent_messages:
+                logger.info("📝 未找到历史对话记录，跳过前端UI加载")
+                return []
+            
+            # 导入消息渲染器
+            try:
+                from ui.message_renderer import MessageRenderer
+            except ImportError:
+                logger.warning("⚠️ 消息渲染器模块未找到，无法创建UI组件")
+                return []
+            
+            # 批量创建历史消息对话框
+            history_dialogs = MessageRenderer.batch_create_history_messages(
+                recent_messages, parent_widget
+            )
+            
+            # 构建返回结果
+            ui_messages = []
+            for i, (msg, dialog) in enumerate(zip(recent_messages, history_dialogs)):
+                message_id = f"history_{i}"
+                message_info = {
+                    'name': msg.get('role', 'user'),
+                    'content': msg.get('content', ''),
+                    'full_content': msg.get('content', ''),
+                    'dialog_widget': dialog
+                }
+                ui_messages.append((message_id, message_info, dialog))
+            
+            logger.info(f"✅ 前端UI已加载 {len(ui_messages)} 条历史对话")
+            return ui_messages
+            
+        except Exception as e:
+            logger.error(f"❌ 前端加载持久化上下文失败: {e}")
+            return []
 
 # 全局实例
 _log_parser = None

@@ -83,9 +83,9 @@ def load_mqtt_config():
         sys.path.append(os.path.dirname(os.path.dirname(__file__)))
         from config import config
         
-        # 检查是否启用MQTT
+        # 检查是否启用物联网通讯
         if not config.mqtt.enabled:
-            logger.info("MQTT功能未启用，跳过初始化")
+            logger.info("物联网通讯功能未启用，跳过初始化")
             return None
             
         return {
@@ -105,9 +105,9 @@ def load_mqtt_config():
             
             mqtt_config = config_data.get('mqtt', {})
             
-            # 检查是否启用MQTT
+            # 检查是否启用物联网通讯
             if not mqtt_config.get('enabled', False):
-                logger.info("MQTT功能未启用，跳过初始化")
+                logger.info("物联网通讯功能未启用，跳过初始化")
                 return None
             
             return {
@@ -134,7 +134,7 @@ if mqtt_config:
         import paho.mqtt.client as mqtt
         MQTT_AVAILABLE = True
     except ImportError:
-        logger.warning("paho-mqtt库未安装，MQTT功能不可用")
+        logger.warning("paho-mqtt库未安装，物联网通讯功能不可用")
         MQTT_AVAILABLE = False
         mqtt = None
 else:
@@ -148,7 +148,7 @@ class DeviceSwitchManager:
     def __init__(self):
         if not mqtt_config or not MQTT_AVAILABLE:
             self.available = False
-            logger.warning("MQTT功能不可用，设备开关控制将无法工作")
+            logger.warning("物联网通讯功能不可用，设备开关控制将无法工作")
             return
             
         self.available = True
@@ -173,15 +173,15 @@ class DeviceSwitchManager:
         if mqtt_config['username'] or mqtt_config['password']:
             self.client.username_pw_set(mqtt_config['username'], mqtt_config['password'])
         
-        # 初始化时自动连接MQTT（如果配置完整）
+        # 初始化时自动连接物联网通讯（如果配置完整）
         self._init_connection()
 
     def _init_connection(self):
-        """初始化时自动连接MQTT"""
+        """初始化时自动连接物联网通讯"""
         try:
-            # 检查MQTT配置是否完整
+            # 检查物联网通讯配置是否完整
             if not mqtt_config:
-                logger.warning("MQTT配置缺失，跳过初始化连接")
+                logger.warning("物联网通讯配置缺失，跳过初始化连接")
                 return
             
             # 检查必要的配置项
@@ -189,10 +189,10 @@ class DeviceSwitchManager:
             missing_configs = [config for config in required_configs if not mqtt_config.get(config)]
             
             if missing_configs:
-                logger.warning(f"MQTT配置不完整，缺少: {missing_configs}，跳过初始化连接")
+                logger.warning(f"物联网通讯配置不完整，缺少: {missing_configs}，跳过初始化连接")
                 return
             
-            logger.info("MQTT配置完整，开始初始化连接...")
+            logger.info("物联网通讯配置完整，开始初始化连接...")
             
             # 尝试连接
             if self.connect():

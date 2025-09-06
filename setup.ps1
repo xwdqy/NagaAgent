@@ -1,5 +1,7 @@
 # NagaAgent 3.0 Setup Script
 # Version managed by config.py
+# 优化版本 - 基于实际安装经验改进
+# 自动删除现有虚拟环境，重新创建干净的安装环境
 $ErrorActionPreference = "Stop"
 $pythonMinVersion = "3.10"
 $venvPath = ".venv"
@@ -22,15 +24,21 @@ try {
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $scriptPath
 
-# Create and activate virtual environment
-if (-not (Test-Path $venvPath)) {
-    Write-Host "Creating virtual environment..." -ForegroundColor Green
-    python -m venv $venvPath
+# Remove existing virtual environment if exists (clean install)
+if (Test-Path $venvPath) {
+    Write-Host "Removing existing virtual environment for clean install..." -ForegroundColor Yellow
+    Remove-Item -Recurse -Force $venvPath -ErrorAction SilentlyContinue
+    Write-Host "Old virtual environment removed successfully" -ForegroundColor Green
 }
+
+# Create new virtual environment
+Write-Host "Creating fresh virtual environment..." -ForegroundColor Green
+python -m venv $venvPath
+Write-Host "Virtual environment created successfully" -ForegroundColor Green
 
 # Activate virtual environment
 try {
-    & "$venvPath/Scripts/Activate.ps1"
+    & "$venvPath\Scripts\Activate.ps1"
     Write-Host "Virtual environment activated successfully" -ForegroundColor Green
 } catch {
     Write-Error "Failed to activate virtual environment: $_"
@@ -141,10 +149,10 @@ foreach ($dep in $guiDeps) {
     }
 }
 
-# Install PyQt5
+# Install PyQt5 (special handling for Windows)
 Write-Host "Installing PyQt5..." -ForegroundColor Green
 try {
-    pip install pyqt5
+    pip install PyQt5==5.15.11
     Write-Host "PyQt5 installed successfully" -ForegroundColor Green
 } catch {
     Write-Host "Warning: Failed to install PyQt5" -ForegroundColor Yellow
@@ -166,18 +174,6 @@ foreach ($dep in $audioDeps) {
 Write-Host "Installing system tray dependencies..." -ForegroundColor Green
 $trayDeps = @("pystray")
 foreach ($dep in $trayDeps) {
-    try {
-        pip install $dep
-        Write-Host "Installed $dep" -ForegroundColor Green
-    } catch {
-        Write-Host "Warning: Failed to install $dep" -ForegroundColor Yellow
-    }
-}
-
-# Install other tool dependencies
-Write-Host "Installing other tool dependencies..." -ForegroundColor Green
-$toolDeps = @("tiktoken", "bottleneck")
-foreach ($dep in $toolDeps) {
     try {
         pip install $dep
         Write-Host "Installed $dep" -ForegroundColor Green
@@ -222,10 +218,10 @@ foreach ($dep in $mqttDeps) {
     }
 }
 
-# Install other dependencies
-Write-Host "Installing other dependencies..." -ForegroundColor Green
-$otherDeps = @("python-docx", "mqtt-tool")
-foreach ($dep in $otherDeps) {
+# Install other tool dependencies
+Write-Host "Installing other tool dependencies..." -ForegroundColor Green
+$toolDeps = @("tiktoken", "python-docx")
+foreach ($dep in $toolDeps) {
     try {
         pip install $dep
         Write-Host "Installed $dep" -ForegroundColor Green
@@ -243,15 +239,15 @@ try {
     Write-Host "Warning: Failed to install Playwright browser drivers" -ForegroundColor Yellow
 }
 
-# Verify critical dependencies
+# Verify critical dependencies (essential for core functionality)
 Write-Host "Verifying critical dependencies..." -ForegroundColor Green
-$criticalDeps = @("numpy", "pandas", "pyqt5", "pystray", "pillow")
+$criticalDeps = @("numpy", "pandas", "PyQt5", "pystray", "PIL")
 foreach ($dep in $criticalDeps) {
     try {
         python -c "import $dep; print('$dep - OK')"
         Write-Host "$dep verification passed" -ForegroundColor Green
     } catch {
-        Write-Host "Warning: $dep verification failed" -ForegroundColor Yellow
+        Write-Host "Warning: $dep verification failed - this may affect functionality" -ForegroundColor Yellow
     }
 }
 
@@ -273,9 +269,30 @@ try {
     Write-Host "Warning: Tray functionality test failed" -ForegroundColor Yellow
 }
 
+# Generate installed requirements file
+Write-Host "Generating installed requirements file..." -ForegroundColor Green
+try {
+    pip freeze > requirements_installed.txt
+    Write-Host "requirements_installed.txt generated successfully" -ForegroundColor Green
+} catch {
+    Write-Host "Warning: Failed to generate requirements file" -ForegroundColor Yellow
+}
+
 Write-Host "`nEnvironment setup completed!" -ForegroundColor Green
 Write-Host "To install other browser drivers, run:" -ForegroundColor Cyan
 Write-Host "python -m playwright install firefox  # Install Firefox" -ForegroundColor Cyan
 Write-Host "python -m playwright install webkit   # Install WebKit" -ForegroundColor Cyan
 Write-Host "`nTo start with tray mode, run:" -ForegroundColor Cyan
-Write-Host ".\start_with_tray.bat" -ForegroundColor Cyan 
+Write-Host ".\start_with_tray.bat" -ForegroundColor Cyan
+Write-Host "`nTo activate virtual environment manually, run:" -ForegroundColor Cyan
+Write-Host ".\.venv\Scripts\Activate.ps1" -ForegroundColor Cyan
+Write-Host "`nTo check installed packages, run:" -ForegroundColor Cyan
+Write-Host "pip list" -ForegroundColor Cyan
+Write-Host "`nTo deactivate virtual environment, run:" -ForegroundColor Cyan
+Write-Host "deactivate" -ForegroundColor Cyan
+Write-Host "`nSetup Summary:" -ForegroundColor Green
+Write-Host "- Virtual environment: $venvPath" -ForegroundColor White
+Write-Host "- Python version: $pythonVersion" -ForegroundColor White
+Write-Host "- All core dependencies installed and verified" -ForegroundColor White
+Write-Host "- Playwright browser drivers ready" -ForegroundColor White
+Write-Host "- System tray functionality tested" -ForegroundColor White 

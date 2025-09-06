@@ -464,7 +464,7 @@ class ElegantSettingsWidget(QWidget):
             voice_checkbox = QCheckBox()
             voice_checkbox.setChecked(config.system.voice_enabled)
             voice_checkbox.setStyleSheet(self.get_checkbox_style() + "color: #fff;")
-            voice_card = SettingCard("语音交互", "启用语音输入和输出功能", voice_checkbox, "system.voice_enabled")
+            voice_card = SettingCard("语音交互", "启用语音输入（ASR+VAD）和输出（TTS）功能", voice_checkbox, "system.voice_enabled")
             voice_card.value_changed.connect(self.on_setting_changed)
             group.add_card(voice_card)
             self.voice_checkbox = voice_checkbox

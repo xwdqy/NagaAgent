@@ -109,7 +109,7 @@ async def execute_tool_calls(tool_calls: list, mcp_manager) -> str:
                 print(f"[DEBUG] MCP调用: service={service_name}, tool={actual_tool_name}, args={tool_args}")
                 
                 if not service_name:
-                    result = "MCP调用失败: 缺少service_name参数"
+                    result = "MCP服务调用失败: 缺少service_name参数"
                 else:
                     result = await mcp_manager.unified_call(
                     service_name=service_name,

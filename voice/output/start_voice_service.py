@@ -15,12 +15,12 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from config import config
 
 def start_http_server():
-    """启动HTTP TTS服务器"""
+    """启动HTTP语音输出服务器"""
     try:
         from voice.output.server import app
         from gevent.pywsgi import WSGIServer
         
-        print(f"🚀 启动HTTP TTS服务器...")
+        print(f"🚀 启动HTTP语音输出服务器...")
         print(f"📍 地址: http://127.0.0.1:{config.tts.port}")
         print(f"🔑 API密钥: {'已启用' if config.tts.require_api_key else '已禁用'}")
         
@@ -28,7 +28,7 @@ def start_http_server():
         http_server.serve_forever()
 
     except Exception as e:
-        print(f"❌ HTTP服务器启动失败: {e}")
+        print(f"❌ HTTP语音输出服务器启动失败: {e}")
         return False
 
 def check_dependencies():
@@ -83,7 +83,7 @@ def main():
         config.tts.port = args.port
     
     print("=" * 50)
-    print("🎤 NagaAgent 语音服务")
+    print("🎤 NagaAgent 语音输出服务")
     print("=" * 50)
     print(f"📋 配置信息:")
     print(f"   端口: {config.tts.port}")

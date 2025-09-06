@@ -23,6 +23,7 @@
 ✅ **🔧 丰富生态**: 支持多种 MCP 服务和 Agent 系统  
 ✅ **🎤 语音交互**: OpenAI 兼容的流式语音合成服务  
 ✅ **🖥️ 现代界面**: 基于 PyQt5 的独立对话框消息渲染系统  
+✅ **🎭 Live2D集成**: 独立的Live2D模块，支持模型和图片的混合侧栏显示  
 ✅ **🌐 完整 API**: FastAPI RESTful API 和流式输出  
 ✅ **📱 系统托盘**: 完整的后台运行和自启动支持  
 ✅ **🔍 智能代理**: 动态服务发现和热插拔管理  
@@ -308,6 +309,8 @@ restore_config_snapshot(snapshot)
 - **context_load_days**: 从最近几天的日志文件中加载历史对话（默认：3天）
 - **context_parse_logs**: 是否从日志文件解析上下文（默认：true）
 
+**前端历史记录显示**: 启用持久化上下文后，重启应用时前端UI会自动加载并显示历史聊天记录，无需手动操作。
+
 ### API服务器配置
 ```json
 {
@@ -347,6 +350,39 @@ restore_config_snapshot(snapshot)
   }
 }
 ```
+
+### Live2D集成配置
+```json
+{
+  "live2d": {
+    "enabled": true,
+    "model_path": "path/to/your/model.model3.json",
+    "fallback_image": "ui/standby.png"
+  }
+}
+```
+
+#### Live2D模块特性
+- **独立模块设计**: 不依赖外部Live2D项目，完全自主实现
+- **完整动画系统**: 支持眨眼、眼球跟踪、身体摆动、呼吸、情绪等动画
+- **自动回退机制**: Live2D不可用时自动切换到图片模式
+- **鼠标交互**: 支持点击触发动作和眼球跟踪
+- **资源管理**: 完整的资源加载和清理机制
+
+#### Live2D模块结构
+```
+ui/live2d/
+├── __init__.py          # 模块初始化
+├── renderer.py          # Live2D渲染器
+├── animator.py          # 动画系统
+├── widget.py            # Live2D Widget组件
+└── README.md            # 详细文档
+```
+
+#### Live2D配置说明
+- **enabled**: 是否启用Live2D功能
+- **model_path**: Live2D模型文件路径（.model3.json格式）
+- **fallback_image**: 回退图片路径（Live2D不可用时使用）
 
 ### 获取 API 密钥
 1. 访问对应的LLM服务商官网（如DeepSeek、OpenAI等）
@@ -401,6 +437,7 @@ restore_config_snapshot(snapshot)
 - **独立对话框**: 每个对话都是独立的对话框组件，采用直角设计，支持自动高度调整
 - **工具调用对话框**: 专门为工具调用设计的对话框，没有用户名标签，保持简洁的UI风格
 - **透明背景**: 主聊天区域使用透明背景，对话框保持原有样式
+- **🎭 Live2D集成**: 独立的Live2D模块，支持模型和图片的混合侧栏显示，自动回退机制
 - **Markdown 支持**: 完整的 Markdown 语法支持和代码高亮
 - **主题定制**: 支持界面主题、透明度等自定义
 - **响应式设计**: 自适应不同屏幕尺寸
@@ -950,6 +987,7 @@ print(result["answer"])  # 输出综合后的最终答案
 - **深度思考引擎**: 基于遗传算法的多分支思考系统
 - **AgentManager**: 独立的Agent注册和调用系统
 - **模块化UI渲染**: 新的消息渲染系统，支持名字+消息框布局
+- **🎭 Live2D集成**: 独立的Live2D模块，支持模型和图片的混合侧栏显示，自动回退机制
 - **MQTT通信支持**: 新增MQTT工具模块
 - **Word文档处理**: 集成Office Word MCP服务
 - **漫画下载Agent**: 新增漫画下载功能Agent

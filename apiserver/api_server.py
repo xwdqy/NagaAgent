@@ -309,7 +309,16 @@ async def chat(request: ChatRequest):
                 if resp.status != 200:
                     # 保存失败的prompt日志
                     prompt_logger.log_prompt(session_id, messages, api_status="failed")
-                    raise HTTPException(status_code=resp.status, detail="LLM API调用失败")
+                    error_detail = f"LLM API调用失败 (状态码: {resp.status})"
+                    if resp.status == 401:
+                        error_detail = "LLM API认证失败，请检查API密钥"
+                    elif resp.status == 403:
+                        error_detail = "LLM API访问被拒绝，请检查权限"
+                    elif resp.status == 429:
+                        error_detail = "LLM API请求过于频繁，请稍后重试"
+                    elif resp.status >= 500:
+                        error_detail = f"LLM API服务器错误 (状态码: {resp.status})"
+                    raise HTTPException(status_code=resp.status, detail=error_detail)
                 
                 # 处理流式响应
                 async for line in resp.content:
@@ -456,7 +465,16 @@ async def chat_stream(request: ChatRequest):
                         if resp.status != 200:
                             # 保存失败的prompt日志
                             prompt_logger.log_prompt(session_id, messages, api_status="failed")
-                            raise HTTPException(status_code=resp.status, detail="LLM API调用失败")
+                            error_detail = f"LLM API调用失败 (状态码: {resp.status})"
+                            if resp.status == 401:
+                                error_detail = "LLM API认证失败，请检查API密钥"
+                            elif resp.status == 403:
+                                error_detail = "LLM API访问被拒绝，请检查权限"
+                            elif resp.status == 429:
+                                error_detail = "LLM API请求过于频繁，请稍后重试"
+                            elif resp.status >= 500:
+                                error_detail = f"LLM API服务器错误 (状态码: {resp.status})"
+                            raise HTTPException(status_code=resp.status, detail=error_detail)
                         
                         # 处理流式响应
                         async for line in resp.content:

@@ -37,8 +37,9 @@ def check_dependencies() -> bool:
         missing.append("scipy")  # 记录 #
     
     if missing:
-        print("❌ 缺少依赖: " + ", ".join(missing))  # 打印 #
+        print("❌ 语音输入服务缺少依赖: " + ", ".join(missing))  # 打印 #
         print("请执行: pip install -r voice/input/requirements.txt")  # 提示 #
+        print("注意：语音输入服务需要onnxruntime库支持VAD功能")  # 说明 #
         return False  # 返回 #
     return True  # 通过 #
 
@@ -63,7 +64,7 @@ def main():
     port = args.port or config.asr.port  # 端口 #
     
     print("=" * 50)  # 分隔线 #
-    print("🎤 NagaAgent 语音输入服务")  # 标题 #
+    print("🎤 NagaAgent 语音输入服务（ASR + VAD）")  # 标题 #
     print("=" * 50)  # 分隔线 #
     print(f"📋 配置信息:")  # 配置 #
     print(f"   端口: {port}")  # 端口 #
@@ -79,7 +80,7 @@ def main():
     import uvicorn  # 导入 #
     from voice.input.server import app  # 导入 #
     
-    print(f"🚀 启动ASR输入服务: http://127.0.0.1:{port}")  # 提示 #
+    print(f"🚀 启动语音输入服务: http://127.0.0.1:{port}")  # 提示 #
     if args.mode in ["websocket", "both"]:
         print(f"🔌 WebSocket端点: ws://127.0.0.1:{port}/v1/audio/asr_ws")  # WebSocket #
     

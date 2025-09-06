@@ -1,4 +1,4 @@
-# 核心依赖
+# 核心依赖 (按setup.ps1安装顺序)
 mcp>=1.6.0
 openai>=1.76.0
 openai-agents>=0.0.13
@@ -28,29 +28,16 @@ websockets>=14.0
 # AI机器学习相关依赖
 numpy>=1.24.0,<2.0.0
 pandas>=2.0.0,<3.0.0
-tqdm>=4.67.1
-scikit-learn>=1.6.1
 scipy>=1.15.2
 transformers>=4.51.3
 
 # 数据处理相关依赖
 pydantic>=2.11.3
 pydantic-settings>=2.9.1
-griffe>=1.7.3
-anyio>=4.9.0
 httpx>=0.28.1
-httpx-sse>=0.4.0
-sse-starlette>=2.3.3
-starlette>=0.46.2
-certifi>=2025.4.26
-charset-normalizer>=3.4.1
-idna>=3.10
-urllib3>=2.4.0
 typing-extensions>=4.13.2
-markdown>=3.8
 
 # GUI界面相关依赖
-pyqt5-qt5==5.15.2
 pyqt5==5.15.11
 playwright>=1.52.0
 greenlet>=3.2.1
@@ -60,23 +47,13 @@ html2text>=2020.1.16
 
 # 音频处理相关依赖
 sounddevice>=0.4.6
-soundfile>=0.12.1
 pyaudio>=0.2.14
 edge-tts>=7.0.2
 emoji>=2.8.0
-noisereduce>=3.0.0
-
-# 语音识别相关依赖
-winrt-runtime>=3.2.1
-onnxruntime>=1.16.0
 
 # 系统托盘相关依赖
 pystray>=0.19.4
 pillow>=10.0.0
-
-# 其他工具依赖
-tiktoken
-bottleneck>=1.3.6
 
 # 系统控制相关依赖
 screen-brightness-control
@@ -90,11 +67,16 @@ fastmcp>=2.11.2
 # MQTT通信相关依赖
 paho-mqtt>=2.0.0
 
-# 其他依赖
+# 其他工具依赖
+tiktoken
 python-docx>=1.2.0
-mqtt-tool>=0.1.1
 
-crawl4ai
-langchain_community
-langchain
+# Live2D相关依赖
+live2d-py>=0.5.4
+pyopengl>=3.1.10
+toml>=0.10.2
+opensimplex>=0.4.5.1
+
+# 搜索工具依赖
+langchain-community>=0.3.29
 

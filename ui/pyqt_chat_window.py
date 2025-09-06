@@ -1,9 +1,8 @@
 import sys, os; sys.path.insert(0, os.path.abspath(os.path.dirname(__file__) + '/..'))
 from .styles.button_factory import ButtonFactory
-import sys, datetime
-from PyQt5.QtWidgets import QApplication, QWidget, QTextEdit, QSizePolicy, QGraphicsBlurEffect, QHBoxLayout, QLabel, QVBoxLayout, QStackedLayout, QPushButton, QStackedWidget, QDesktopWidget, QScrollArea, QSplitter, QGraphicsDropShadowEffect, QFileDialog, QMessageBox, QFrame
-from PyQt5.QtCore import Qt, QRect, QThread, pyqtSignal, QParallelAnimationGroup, QPropertyAnimation, QEasingCurve, QTimer
-from PyQt5.QtGui import QColor, QPainter, QBrush, QFont, QPixmap, QPalette, QPen, QIcon
+from PyQt5.QtWidgets import QApplication, QWidget, QTextEdit, QSizePolicy, QHBoxLayout, QLabel, QVBoxLayout, QStackedLayout, QPushButton, QStackedWidget, QDesktopWidget, QScrollArea, QSplitter, QFileDialog, QMessageBox, QFrame
+from PyQt5.QtCore import Qt, QRect, QParallelAnimationGroup, QPropertyAnimation, QEasingCurve, QTimer
+from PyQt5.QtGui import QColor, QPainter, QBrush, QFont, QPen
 from conversation_core import NagaConversation
 import os
 from config import config, AI_NAME # 导入统一配置
@@ -12,15 +11,11 @@ from ui.styles.progress_widget import EnhancedProgressWidget  # 导入进度组�
 from ui.enhanced_worker import StreamingWorker, BatchWorker  # 导入增强Worker
 from ui.elegant_settings_widget import ElegantSettingsWidget
 from ui.message_renderer import MessageRenderer  # 导入消息渲染器
-import asyncio
+from ui.live2d_side_widget import Live2DSideWidget  # 导入Live2D侧栏组件
 import json
-import threading
-from PyQt5.QtCore import QObject, pyqtSignal as Signal
 import requests
-import shutil
 from pathlib import Path
 import time
-import os
 
 # 使用统一配置系统
 BG_ALPHA = config.ui.bg_alpha
@@ -74,81 +69,6 @@ class TitleBar(QWidget):
         x=s.width()-MAC_BTN_MARGIN
         for i,btn in enumerate([s.btn_min,s.btn_close]):btn.move(x-MAC_BTN_SIZE*(2-i)-MAC_BTN_GAP*(1-i),36)
 
-class AnimatedSideWidget(QWidget):
-    """自定义侧栏Widget，支持动画发光效果"""
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.bg_alpha = int(BG_ALPHA * 255)
-        self.border_alpha = 50
-        self.glow_intensity = 0  # 发光强度 0-20
-        self.is_glowing = False
-        
-    def set_background_alpha(self, alpha):
-        """设置背景透明度"""
-        self.bg_alpha = alpha
-        self.update()
-        
-    def set_border_alpha(self, alpha):
-        """设置边框透明度"""
-        self.border_alpha = alpha
-        self.update()
-        
-    def set_glow_intensity(self, intensity):
-        """设置发光强度 0-20"""
-        self.glow_intensity = max(0, min(20, intensity))
-        self.update()
-        
-    def start_glow_animation(self):
-        """开始发光动画"""
-        self.is_glowing = True
-        self.update()
-        
-    def stop_glow_animation(self):
-        """停止发光动画"""
-        self.is_glowing = False
-        self.glow_intensity = 0
-        self.update()
-        
-    def paintEvent(self, event):
-        """自定义绘制方法"""
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        
-        rect = self.rect()
-        
-        # 绘制发光效果（如果有）
-        if self.glow_intensity > 0:
-            glow_rect = rect.adjusted(-2, -2, 2, 2)
-            glow_color = QColor(100, 200, 255, self.glow_intensity)
-            painter.setPen(QPen(glow_color, 2))
-            painter.setBrush(QBrush(Qt.NoBrush))
-            painter.drawRoundedRect(glow_rect, 17, 17)
-        
-        # 绘制主要背景
-        bg_color = QColor(17, 17, 17, self.bg_alpha)
-        painter.setBrush(QBrush(bg_color))
-        
-        # 绘制边框
-        border_color = QColor(255, 255, 255, self.border_alpha)
-        painter.setPen(QPen(border_color, 1))
-        
-        # 绘制圆角矩形
-        painter.drawRoundedRect(rect, 15, 15)
-        
-        super().paintEvent(event)
-
-class AutoFitLabel(QLabel):
-    def __init__(self, *a, **kw):
-        super().__init__(*a, **kw)
-        self.setWordWrap(True)
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        # 自动调整字体大小以适应标签大小
-        font = self.font()
-        font_size = min(self.width() // 20, self.height() // 2, 16)
-        font.setPointSize(max(font_size, 8))
-        self.setFont(font)
 
 class ChatWindow(QWidget):
     def __init__(s):
@@ -181,7 +101,7 @@ class ChatWindow(QWidget):
             }}
         """)
         
-        fontfam,fontbig,fontsize='Lucida Console',16,16
+        fontfam,fontsize='Lucida Console',16
         
         # 创建主分割器，替换原来的HBoxLayout
         s.main_splitter = QSplitter(Qt.Horizontal, s)
@@ -312,8 +232,8 @@ class ChatWindow(QWidget):
         # 将聊天区域添加到分割器
         s.main_splitter.addWidget(chat_area)
         
-        # 侧栏（图片显示区域）- 使用自定义动画Widget
-        s.side = AnimatedSideWidget()
+        # 侧栏（Live2D/图片显示区域）- 使用Live2D侧栏Widget
+        s.side = Live2DSideWidget()
         s.collapsed_width = 400  # 收缩状态宽度
         s.expanded_width = 800  # 展开状态宽度
         s.side.setMinimumWidth(s.collapsed_width)  # 设置最小宽度为收缩状态
@@ -336,14 +256,16 @@ class ChatWindow(QWidget):
         # 设置鼠标指针，提示可点击
         s.side.setCursor(Qt.PointingHandCursor)
         
-        stack=QStackedLayout(s.side);stack.setContentsMargins(5,5,5,5)
-        s.img=QLabel(s.side)
-        s.img.setSizePolicy(QSizePolicy.Ignored,QSizePolicy.Ignored)
-        s.img.setAlignment(Qt.AlignCenter)
-        s.img.setMinimumSize(1,1)
-        s.img.setMaximumSize(16777215,16777215)
-        s.img.setStyleSheet('background:transparent; border: none;')
-        stack.addWidget(s.img)
+        # 设置默认图片
+        default_image = os.path.join(os.path.dirname(__file__), 'standby.png')
+        if os.path.exists(default_image):
+            s.side.set_fallback_image(default_image)
+        
+        # 连接Live2D侧栏的信号
+        s.side.model_loaded.connect(s.on_live2d_model_loaded)
+        s.side.error_occurred.connect(s.on_live2d_error)
+        
+        # 创建昵称标签（保持原有功能）
         nick=QLabel(f"● {AI_NAME}{config.system.version}",s.side)
         nick.setStyleSheet("""
             QLabel {
@@ -358,7 +280,6 @@ class ChatWindow(QWidget):
         nick.setAlignment(Qt.AlignHCenter|Qt.AlignTop)
         nick.setAttribute(Qt.WA_TransparentForMouseEvents)
         nick.hide()  # 隐藏昵称
-        stack.addWidget(nick)
         
         # 将侧栏添加到分割器
         s.main_splitter.addWidget(s.side)
@@ -380,6 +301,17 @@ class ChatWindow(QWidget):
         s.animating = False  # 动画标志位，动画期间为True
         s._img_inited = False  # 标志变量，图片自适应只在初始化时触发一次
         
+        # Live2D相关配置
+        s.live2d_enabled = getattr(config, 'live2d', {}).get('enabled', False)  # 是否启用Live2D
+        s.live2d_model_path = getattr(config, 'live2d', {}).get('model_path', '')  # Live2D模型路径
+        
+        # 初始化消息存储
+        s._messages = {}
+        s._message_counter = 0
+        
+        # 加载持久化历史对话到前端
+        s._load_persistent_context_to_ui()
+        
         # 连接进度组件信号
         s.progress_widget.cancel_requested.connect(s.cancel_current_task)
         
@@ -397,6 +329,9 @@ class ChatWindow(QWidget):
         s.titlebar.setGeometry(0,0,s.width(),100)
         s.side.mousePressEvent=s.toggle_full_img # 侧栏点击切换聊天/设置
         s.resizeEvent(None)  # 强制自适应一次，修复图片初始尺寸
+        
+        # 初始化Live2D（如果启用）
+        s.initialize_live2d()
 
     def create_settings_page(s):
         page = QWidget()
@@ -460,25 +395,9 @@ class ChatWindow(QWidget):
     def resizeEvent(s, e):
         if getattr(s, '_animating', False):  # 动画期间跳过所有重绘操作，避免卡顿
             return
-        if hasattr(s,'img'):
-            s.img.resize(s.img.parent().width(), s.img.parent().height())
-            # 延迟图片缩放操作，避免频繁重绘
-            if not hasattr(s, '_resize_timer'):
-                s._resize_timer = QTimer()
-                s._resize_timer.setSingleShot(True)
-                s._resize_timer.timeout.connect(s._delayed_image_resize)
-            s._resize_timer.start(50)  # 50ms后执行图片缩放
+        # 图片调整现在由Live2DSideWidget内部处理
+        super().resizeEvent(e)
             
-    def _delayed_image_resize(s):
-        """延迟执行的图片缩放，避免频繁重绘"""
-        if hasattr(s, 'img') and not getattr(s, '_animating', False):
-            p = os.path.join(os.path.dirname(__file__), 'standby.png')
-            q = QPixmap(p)
-            if os.path.exists(p) and not q.isNull():
-                # 确保图片完全填满侧栏，无空隙
-                parent_width = s.img.parent().width()
-                parent_height = s.img.parent().height()
-                s.img.setPixmap(q.scaled(parent_width, parent_height, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
 
     def adjust_input_height(s):
         doc = s.input.document()
@@ -561,6 +480,51 @@ class ChatWindow(QWidget):
             s.chat_scroll_area.verticalScrollBar().maximum()
         ))
         
+    def _load_persistent_context_to_ui(s):
+        """从持久化上下文加载历史对话到前端UI"""
+        try:
+            # 检查是否启用持久化上下文
+            if not config.api.persistent_context:
+                print("📝 持久化上下文功能已禁用，跳过历史记录加载")
+                return
+                
+            # 导入日志解析器
+            from logs.log_context_parser import get_log_parser
+            parser = get_log_parser()
+            
+            # 使用新的方法加载历史对话到UI
+            ui_messages = parser.load_persistent_context_to_ui(
+                parent_widget=s.chat_content,
+                max_messages=config.api.max_history_rounds * 2
+            )
+            
+            if ui_messages:
+                # 将历史消息添加到UI布局中
+                for message_id, message_info, dialog in ui_messages:
+                    # 在弹性空间之前插入历史消息对话框
+                    stretch_index = s.chat_layout.count() - 1
+                    s.chat_layout.insertWidget(stretch_index, dialog)
+                    
+                    # 存储到消息管理器中
+                    s._messages[message_id] = message_info
+                
+                # 更新消息计数器
+                s._message_counter = len(ui_messages)
+                
+                # 滚动到底部显示最新消息
+                s.scroll_to_bottom()
+                
+                print(f"✅ 前端UI已加载 {len(ui_messages)} 条历史对话")
+            else:
+                print("📝 前端UI未找到历史对话记录")
+                
+        except ImportError as e:
+            print(f"⚠️ 日志解析器模块未找到，跳过前端历史记录加载: {e}")
+        except Exception as e:
+            print(f"❌ 前端加载持久化上下文失败: {e}")
+            # 失败时不影响正常使用，继续使用空上下文
+            print("💡 将继续使用空上下文，不影响正常对话功能")
+    
     def clear_chat_history(s):
         """清除聊天历史记录"""
         # 清除所有消息对话框
@@ -858,45 +822,15 @@ class ChatWindow(QWidget):
             input_show_anim.setEasingCurve(QEasingCurve.OutQuad)
             group.addAnimation(input_show_anim)
         
-        # 预加载原始图片，避免重复加载
-        if not hasattr(s, '_original_pixmap'):
-            p = os.path.join(os.path.dirname(__file__), 'standby.png')
-            if os.path.exists(p):
-                s._original_pixmap = QPixmap(p)
-        
         def on_side_width_changed():
-            """侧栏宽度变化时实时更新图片"""
-            if hasattr(s, '_original_pixmap') and not s._original_pixmap.isNull():
-                current_width = s.side.width() - 10  # 减去margin
-                current_height = s.side.height() - 10
-                
-                if current_width > 50 and current_height > 50:  # 避免过小尺寸
-                    # 实时缩放并设置图片
-                    scaled_pixmap = s._original_pixmap.scaled(
-                        current_width, current_height, 
-                        Qt.KeepAspectRatioByExpanding, 
-                        Qt.FastTransformation  # 使用快速变换，提高性能
-                    )
-                    s.img.setPixmap(scaled_pixmap)
-                    s.img.resize(current_width, current_height)
-                    
-                    # 昵称始终隐藏
+            """侧栏宽度变化时实时更新"""
+            # Live2D侧栏会自动处理大小调整
+            pass
         
         def on_animation_finished():
             s._animating = False  # 动画结束标志
-            # 最终使用高质量变换
-            if hasattr(s, '_original_pixmap') and not s._original_pixmap.isNull():
-                actual_width = target_width - 10
-                actual_height = s.side.height() - 10
-                final_pixmap = s._original_pixmap.scaled(
-                    actual_width, actual_height,
-                    Qt.KeepAspectRatioByExpanding,
-                    Qt.SmoothTransformation  # 最终使用高质量变换
-                )
-                s.img.setPixmap(final_pixmap)
-                s.img.resize(actual_width, actual_height)
-                
-                # 昵称始终隐藏
+            # Live2D侧栏会自动处理最终调整
+            pass
         
         # 连接信号
         side_anim.valueChanged.connect(on_side_width_changed)
@@ -1030,20 +964,8 @@ class ChatWindow(QWidget):
         # 其他初始化代码...
         s.setFocus()
         s.input.setFocus()
-        if not getattr(s, '_img_inited', False) and not getattr(s, '_animating', False):
-            if hasattr(s, 'img'):
-                # 获取实际的侧栏尺寸（减去margin）
-                parent_width = s.img.parent().width()
-                parent_height = s.img.parent().height()
-                actual_width = parent_width - 10  # 减去左右margin 5px
-                actual_height = parent_height - 10  # 减去上下margin 5px
-                
-                s.img.resize(actual_width, actual_height)
-                p = os.path.join(os.path.dirname(__file__), 'standby.png')
-                q = QPixmap(p)
-                if os.path.exists(p) and not q.isNull():
-                    s.img.setPixmap(q.scaled(actual_width, actual_height, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
-            s._img_inited = True
+        # 图片初始化现在由Live2DSideWidget处理
+        s._img_inited = True
 
     def upload_document(s):
         """上传文档功能"""
@@ -1267,6 +1189,69 @@ class ChatWindow(QWidget):
                 s.add_user_message("系统", "❌ 未找到五元组数据，请先进行对话以生成知识图谱")
         except Exception as e:
             s.add_user_message("系统", f"❌ 打开心智云图失败: {str(e)}")
+    
+    def initialize_live2d(s):
+        """初始化Live2D"""
+        if s.live2d_enabled and s.live2d_model_path:
+            if os.path.exists(s.live2d_model_path):
+                s.add_user_message("系统", "🔄 正在加载Live2D模型...")
+                success = s.side.set_live2d_model(s.live2d_model_path)
+                if success:
+                    s.add_user_message("系统", "✅ Live2D模型加载成功")
+                else:
+                    s.add_user_message("系统", "⚠️ Live2D模型加载失败，已回退到图片模式")
+            else:
+                s.add_user_message("系统", f"⚠️ Live2D模型文件不存在: {s.live2d_model_path}")
+        else:
+            print("📝 Live2D功能未启用或未配置模型路径")
+    
+    def on_live2d_model_loaded(s, success):
+        """Live2D模型加载状态回调"""
+        if success:
+            print("✅ Live2D模型已成功加载")
+        else:
+            print("🔄 已回退到图片模式")
+    
+    def on_live2d_error(s, error_msg):
+        """Live2D错误回调"""
+        s.add_user_message("系统", f"❌ Live2D错误: {error_msg}")
+    
+    def set_live2d_model(s, model_path):
+        """设置Live2D模型"""
+        if not os.path.exists(model_path):
+            s.add_user_message("系统", f"❌ Live2D模型文件不存在: {model_path}")
+            return False
+        
+        s.live2d_model_path = model_path
+        s.live2d_enabled = True
+        
+        s.add_user_message("系统", "🔄 正在切换Live2D模型...")
+        success = s.side.set_live2d_model(model_path)
+        
+        if success:
+            s.add_user_message("系统", "✅ Live2D模型切换成功")
+        else:
+            s.add_user_message("系统", "⚠️ Live2D模型切换失败，已回退到图片模式")
+        
+        return success
+    
+    def set_fallback_image(s, image_path):
+        """设置回退图片"""
+        if not os.path.exists(image_path):
+            s.add_user_message("系统", f"❌ 图片文件不存在: {image_path}")
+            return False
+        
+        s.side.set_fallback_image(image_path)
+        s.add_user_message("系统", f"✅ 回退图片已设置: {os.path.basename(image_path)}")
+        return True
+    
+    def get_display_mode(s):
+        """获取当前显示模式"""
+        return s.side.get_display_mode()
+    
+    def is_live2d_available(s):
+        """检查Live2D是否可用"""
+        return s.side.is_live2d_available()
 
 if __name__=="__main__":
     app = QApplication(sys.argv)
