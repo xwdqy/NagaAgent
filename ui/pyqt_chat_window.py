@@ -3,9 +3,9 @@ from .styles.button_factory import ButtonFactory
 from PyQt5.QtWidgets import QApplication, QWidget, QTextEdit, QSizePolicy, QHBoxLayout, QLabel, QVBoxLayout, QStackedLayout, QPushButton, QStackedWidget, QDesktopWidget, QScrollArea, QSplitter, QFileDialog, QMessageBox, QFrame
 from PyQt5.QtCore import Qt, QRect, QParallelAnimationGroup, QPropertyAnimation, QEasingCurve, QTimer
 from PyQt5.QtGui import QColor, QPainter, QBrush, QFont, QPen
-from conversation_core import NagaConversation
+from system.conversation_core import NagaConversation
 import os
-from config import config, AI_NAME # 导入统一配置
+from system.config import config, AI_NAME, Live2DConfig # 导入统一配置
 from ui.response_utils import extract_message  # 新增：引入消息提取工具
 from ui.styles.progress_widget import EnhancedProgressWidget  # 导入进度组件
 from ui.enhanced_worker import StreamingWorker, BatchWorker  # 导入增强Worker
@@ -18,13 +18,27 @@ from pathlib import Path
 import time
 
 # 使用统一配置系统
-BG_ALPHA = config.ui.bg_alpha
-WINDOW_BG_ALPHA = config.ui.window_bg_alpha
-USER_NAME = config.ui.user_name
-MAC_BTN_SIZE = config.ui.mac_btn_size
-MAC_BTN_MARGIN = config.ui.mac_btn_margin
-MAC_BTN_GAP = config.ui.mac_btn_gap
-ANIMATION_DURATION = config.ui.animation_duration
+def get_ui_config():
+    """获取UI配置，确保使用最新的配置值"""
+    return {
+        'BG_ALPHA': config.ui.bg_alpha,
+        'WINDOW_BG_ALPHA': config.ui.window_bg_alpha,
+        'USER_NAME': config.ui.user_name,
+        'MAC_BTN_SIZE': config.ui.mac_btn_size,
+        'MAC_BTN_MARGIN': config.ui.mac_btn_margin,
+        'MAC_BTN_GAP': config.ui.mac_btn_gap,
+        'ANIMATION_DURATION': config.ui.animation_duration
+    }
+
+# 初始化全局变量
+ui_config = get_ui_config()
+BG_ALPHA = ui_config['BG_ALPHA']
+WINDOW_BG_ALPHA = ui_config['WINDOW_BG_ALPHA']
+USER_NAME = ui_config['USER_NAME']
+MAC_BTN_SIZE = ui_config['MAC_BTN_SIZE']
+MAC_BTN_MARGIN = ui_config['MAC_BTN_MARGIN']
+MAC_BTN_GAP = ui_config['MAC_BTN_GAP']
+ANIMATION_DURATION = ui_config['ANIMATION_DURATION']
 
 
 
@@ -302,8 +316,8 @@ class ChatWindow(QWidget):
         s._img_inited = False  # 标志变量，图片自适应只在初始化时触发一次
         
         # Live2D相关配置
-        s.live2d_enabled = getattr(config, 'live2d', {}).get('enabled', False)  # 是否启用Live2D
-        s.live2d_model_path = getattr(config, 'live2d', {}).get('model_path', '')  # Live2D模型路径
+        s.live2d_enabled = config.live2d.enabled  # 是否启用Live2D
+        s.live2d_model_path = config.live2d.model_path  # Live2D模型路径
         
         # 初始化消息存储
         s._messages = {}
@@ -920,8 +934,9 @@ class ChatWindow(QWidget):
         """从配置中应用UI透明度(聊天区/输入框/侧栏/窗口)"""
         # 更新全局变量，保持其它逻辑一致 #
         global BG_ALPHA, WINDOW_BG_ALPHA
+        # 直接读取配置值，避免函数调用开销
         BG_ALPHA = config.ui.bg_alpha
-        WINDOW_BG_ALPHA = config.ui.window_bg_alpha if isinstance(config.ui.window_bg_alpha, int) else int(config.ui.window_bg_alpha * 255)
+        WINDOW_BG_ALPHA = config.ui.window_bg_alpha
 
         # 计算alpha #
         alpha_px = int(BG_ALPHA * 255)
@@ -956,6 +971,50 @@ class ChatWindow(QWidget):
 
         # 更新主窗口背景 #
         s.set_window_background_alpha(WINDOW_BG_ALPHA)
+    
+    def apply_transparency_preview(s, bg_alpha=None, window_bg_alpha=None):
+        """应用透明度预览（临时值，不修改配置）"""
+        try:
+            # 使用传入的临时值或当前配置值
+            temp_bg_alpha = bg_alpha if bg_alpha is not None else config.ui.bg_alpha
+            temp_window_bg_alpha = window_bg_alpha if window_bg_alpha is not None else config.ui.window_bg_alpha
+            
+            # 计算alpha值
+            alpha_px = int(temp_bg_alpha * 255)
+            window_alpha_px = temp_window_bg_alpha if isinstance(temp_window_bg_alpha, int) else int(temp_window_bg_alpha * 255)
+
+            # 更新输入框背景
+            fontfam, fontsize = 'Lucida Console', 16
+            s.input.setStyleSheet(f"""
+                QTextEdit {{
+                    background: rgba(17,17,17,{alpha_px});
+                    color: #fff;
+                    border-radius: 15px;
+                    border: 1px solid rgba(255, 255, 255, 50);
+                    font: {fontsize}pt '{fontfam}';
+                    padding: 8px;
+                }}
+            """)
+
+            # 更新侧栏背景
+            if hasattr(s, 'side') and isinstance(s.side, QWidget):
+                try:
+                    s.side.set_background_alpha(alpha_px)
+                except Exception:
+                    pass
+
+            # 更新主窗口背景
+            s.setStyleSheet(f"""
+                ChatWindow {{
+                    background: rgba(25, 25, 25, {window_alpha_px});
+                    border-radius: 20px;
+                    border: 1px solid rgba(255, 255, 255, 30);
+                }}
+            """)
+            s.update()
+            
+        except Exception as e:
+            print(f"透明度预览应用失败: {e}")
 
     def showEvent(s, event):
         """窗口显示事件"""

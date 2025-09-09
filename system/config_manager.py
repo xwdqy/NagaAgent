@@ -14,9 +14,9 @@ from typing import Dict, Any, List, Callable, Optional
 from pathlib import Path
 
 # 添加项目根目录到路径
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from config import config, hot_reload_config, add_config_listener, remove_config_listener
+from .config import config, hot_reload_config, add_config_listener, remove_config_listener
 
 class ConfigManager:
     """配置管理器 - 统一管理配置热更新
@@ -111,10 +111,13 @@ class ConfigManager:
         except Exception as e:
             print(f"❌ 模块重新加载失败: {module_name} - {e}")
     
-    def start_config_watcher(self, config_file: str = "config.json"):
+    def start_config_watcher(self, config_file: str = None):
         """启动配置文件监视器"""
         if self._config_watcher_thread and self._config_watcher_thread.is_alive():
             return
+        
+        if config_file is None:
+            config_file = str(Path(__file__).parent.parent / "config.json")
         
         self._stop_watching = False
         self._config_watcher_thread = threading.Thread(
@@ -168,7 +171,7 @@ class ConfigManager:
             print(f"🔄 开始更新配置，共 {len(updates)} 项...")
             
             # 验证配置文件存在性
-            config_path = "config.json"
+            config_path = str(Path(__file__).parent.parent / "config.json")
             if not os.path.exists(config_path):
                 print(f"❌ 配置文件不存在: {config_path}")
                 return False
@@ -231,7 +234,8 @@ class ConfigManager:
         """获取配置快照"""
         # 直接读取config.json文件，避免序列化问题
         try:
-            with open("config.json", 'r', encoding='utf-8') as f:
+            config_path = str(Path(__file__).parent.parent / "config.json")
+            with open(config_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
             print(f"❌ 获取配置快照失败: {e}")
@@ -254,7 +258,7 @@ class ConfigManager:
     def restore_config_snapshot(self, snapshot: Dict[str, Any]) -> bool:
         """恢复配置快照"""
         try:
-            config_path = "config.json"
+            config_path = str(Path(__file__).parent.parent / "config.json")
             with open(config_path, 'w', encoding='utf-8') as f:
                 json.dump(snapshot, f, ensure_ascii=False, indent=2)
             
@@ -314,7 +318,7 @@ def update_config(updates: Dict[str, Any]) -> bool:
     """
     return config_manager.update_config(updates)
 
-def start_config_watcher(config_file: str = "config.json"):
+def start_config_watcher(config_file: str = None):
     """启动配置监视器
     
     Args:

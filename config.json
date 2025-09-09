@@ -1,19 +1,23 @@
 {
   "system": {
     "version": "3.0",
+    "ai_name": "娜迦日达",
     "voice_enabled": true,
     "stream_mode": true,
-    "debug": false,
+    "debug": true,
     "log_level": "DEBUG",
     "save_prompts": true
   },
   "api": {
-    "api_key": " ",
-    "base_url": "https://naga.furina.chat/v1",
-    "model": " ",
+    "api_key": "your_api_key_here",
+    "base_url": "https://api.openai.com/v1",
+    "model": "gpt-3.5-turbo",
     "temperature": 0.7,
     "max_tokens": 2000,
-    "max_history_rounds": 10
+    "max_history_rounds": 10,
+    "persistent_context": true,
+    "context_load_days": 3,
+    "context_parse_logs": true
   },
   "api_server": {
     "enabled": true,
@@ -29,7 +33,7 @@
     "similarity_threshold": 0.6,
     "neo4j_uri": "neo4j://127.0.0.1:7687",
     "neo4j_user": "neo4j",
-    "neo4j_password": "Xx2017105",
+    "neo4j_password": "your_neo4j_password",
     "neo4j_database": "neo4j",
     "extraction_timeout": 12,
     "extraction_retries": 2,
@@ -55,23 +59,23 @@
     "require_api_key": false
   },
   "weather": {
-    "api_key": " "
+    "api_key": "your_weather_api_key"
   },
   "mqtt": {
     "enabled": true,
-    "broker": " ",
+    "broker": "your_mqtt_broker",
     "port": 1883,
-    "topic": " ",
-    "client_id": " ",
-    "username": " ",
-    "password": " ",
+    "topic": "your_topic",
+    "client_id": "your_client_id",
+    "username": "your_username",
+    "password": "your_password",
     "keepalive": 60,
     "qos": 1
   },
   "ui": {
     "user_name": "用户",
-    "bg_alpha": 0.81,
-    "window_bg_alpha": 128,
+    "bg_alpha": 0.72,
+    "window_bg_alpha": 200,
     "mac_btn_size": 36,
     "mac_btn_margin": 16,
     "mac_btn_gap": 12,
@@ -79,13 +83,35 @@
   },
   "naga_portal": {
     "portal_url": "https://naga.furina.chat/",
-    "username": " ",
-    "password": " "
+    "username": "your_username",
+    "password": "your_password"
   },
   "online_search": {
-    "Bocha_API_KEY": "-",
-    "Bocha_Url": "https://api.bochaai.com/v1/web-search",
-    "Bocha_count": 5
+    "searxng_url": "https://searxng.pylindex.top",
+    "engines": [
+      "google"
+    ],
+    "num_results": 5
   },
-  "invalid": "config"
+  "crawl4ai": {
+    "headless": true,
+    "timeout": 30000,
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    "viewport_width": 1280,
+    "viewport_height": 720
+  },
+  "live2d": {
+    "enabled": true,
+    "model_path": "ui/live2d/live2d_models/characters/llny/mianfeimox/llny.model3.json",
+    "fallback_image": "ui/standby.png",
+    "auto_switch": true,
+    "animation_enabled": true,
+    "touch_interaction": true
+  },
+  "system_check": {
+    "passed": true,
+    "timestamp": "Windows",
+    "python_version": "3.13.3",
+    "project_path": "your_project_path"
+  }
 }

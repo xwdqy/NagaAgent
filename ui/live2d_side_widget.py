@@ -26,8 +26,18 @@ class Live2DSideWidget(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.bg_alpha = 200  # 背景透明度
-        self.border_alpha = 50  # 边框透明度
+        # 从配置中读取透明度设置，避免硬编码
+        try:
+            import sys, os
+            sys.path.insert(0, os.path.abspath(os.path.dirname(__file__) + '/..'))
+            from config import config
+            # 使用配置中的透明度，转换为0-255范围
+            self.bg_alpha = int(config.ui.bg_alpha * 255)  # 背景透明度
+            self.border_alpha = 50  # 边框透明度（保持固定值）
+        except Exception:
+            # 如果配置加载失败，使用默认值
+            self.bg_alpha = 200  # 背景透明度
+            self.border_alpha = 50  # 边框透明度
         self.glow_intensity = 0  # 发光强度
         self.is_glowing = False
         

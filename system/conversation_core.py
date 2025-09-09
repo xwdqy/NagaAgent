@@ -14,10 +14,10 @@ from typing import List, Dict
 from openai import AsyncOpenAI
 
 # 本地模块导入
-from apiserver.tool_call_utils import tool_call_loop
-from config import config, AI_NAME
-from mcpserver.mcp_manager import get_mcp_manager
-from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
+from ..apiserver.tool_call_utils import tool_call_loop
+from .config import config, AI_NAME
+from ..mcpserver.mcp_manager import get_mcp_manager
+from ..agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
 # from thinking import TreeThinkingEngine
 # from thinking.config import COMPLEX_KEYWORDS  # 已废弃，不再使用
 
@@ -54,7 +54,7 @@ def init_memory_manager():
         return None
     
     try:
-        from summer_memory.memory_manager import memory_manager
+        from ..summer_memory.memory_manager import memory_manager
         print("[GRAG] ✅ 夏园记忆系统初始化成功")
         return memory_manager
     except Exception as e:
@@ -136,7 +136,7 @@ class NagaConversation: # 对话主类
             return
             
         try:
-            from logs.log_context_parser import get_log_parser
+            from ..logs.log_context_parser import get_log_parser
             parser = get_log_parser()
             
             # 计算最大消息数量
@@ -199,7 +199,7 @@ class NagaConversation: # 对话主类
                     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                     sys.path.insert(0, project_root)
                     
-                    from mcpserver.agent_naga_portal.portal_login_manager import auto_login_naga_portal
+                    from ..mcpserver.agent_naga_portal.portal_login_manager import auto_login_naga_portal
                     
                     # 创建新的事件循环
                     import asyncio
@@ -240,7 +240,7 @@ class NagaConversation: # 对话主类
     def _show_naga_portal_status(self):
         """显示NagaPortal状态（登录完成后调用）"""
         try:
-            from mcpserver.agent_naga_portal.portal_login_manager import get_portal_login_manager
+            from ..mcpserver.agent_naga_portal.portal_login_manager import get_portal_login_manager
             login_manager = get_portal_login_manager()
             status = login_manager.get_status()
             cookies = login_manager.get_cookies()
@@ -366,7 +366,7 @@ class NagaConversation: # 对话主类
         current_time = ""
         try:
             # 从WeatherTimeAgent获取本地城市信息
-            from mcpserver.agent_weather_time.agent_weather_time import WeatherTimeTool
+            from ..mcpserver.agent_weather_time.agent_weather_time import WeatherTimeTool
             weather_tool = WeatherTimeTool()
             local_city = getattr(weather_tool, '_local_city', '未知城市') or '未知城市'
             
@@ -405,11 +405,7 @@ class NagaConversation: # 对话主类
                             params = []
                             for key, value in example_data.items():
                                 if key != 'tool_name':
-                                    # 特殊处理city参数，注入本地城市信息
-                                    if key == 'city' and name == 'WeatherTimeAgent':
-                                        params.append(f"{key}: {local_city}")
-                                    else:
-                                        params.append(f"{key}: {value}")
+                                    params.append(f"{key}: {value}")  # 不再需要对天气进行特殊处理
                             
                             # 构建调用格式
                             format_str = f"  {tool_name}: ｛\n"
@@ -419,10 +415,7 @@ class NagaConversation: # 对话主类
                             for param in params:
                                 # 将中文参数名转换为英文
                                 param_key, param_value = param.split(': ', 1)
-                                if param_key == 'city' and name == 'WeatherTimeAgent':
-                                    format_str += f"    \"{param_key}\": \"{local_city}\",\n"
-                                else:
-                                    format_str += f"    \"{param_key}\": \"{param_value}\",\n"
+                                format_str += f"    \"{param_key}\": \"{param_value}\",\n"
                             format_str += f"  ｝\n"
                             
                             mcp_list.append(format_str)
@@ -447,7 +440,7 @@ class NagaConversation: # 对话主类
         
         # 2. 直接从AgentManager获取已注册的Agent
         try:
-            from mcpserver.agent_manager import get_agent_manager
+            from ..mcpserver.agent_manager import get_agent_manager
             agent_manager = get_agent_manager()
             agent_manager_agents = agent_manager.get_available_agents()
             
@@ -498,7 +491,7 @@ class NagaConversation: # 对话主类
             system_prompt = f"{RECOMMENDED_PROMPT_PREFIX}\n{config.prompts.naga_system_prompt.format(ai_name=AI_NAME, **services_text)}"
             
             # 使用消息管理器统一的消息拼接逻辑（UI界面使用）
-            from apiserver.message_manager import message_manager
+            from ..apiserver.message_manager import message_manager
             msgs = message_manager.build_conversation_messages_from_memory(
                 memory_messages=self.messages,
                 system_prompt=system_prompt,
@@ -518,7 +511,7 @@ class NagaConversation: # 对话主类
             # 流式处理：实时检测工具调用，使用统一的工具调用循环
             try:
                 # 导入流式工具调用提取器
-                from apiserver.streaming_tool_extractor import StreamingToolCallExtractor
+                from ..apiserver.streaming_tool_extractor import StreamingToolCallExtractor
                 import queue
                 
                 # 创建工具调用队列
@@ -570,6 +563,14 @@ class NagaConversation: # 对话主类
                 
                 # 处理流式响应
                 async for chunk in resp:
+                    # 原始增量日志（AI 原始输出）
+                    try:
+                        delta = getattr(chunk.choices[0], 'delta', None) if chunk.choices else None
+                        if delta is not None:
+                            logger.info("openai.delta: %r", getattr(delta, 'content', None))
+                    except Exception:
+                        pass
+
                     # 安全检查：确保chunk.choices不为空且有内容
                     if (chunk.choices and 
                         len(chunk.choices) > 0 and 

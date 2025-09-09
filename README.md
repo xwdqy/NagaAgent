@@ -32,6 +32,7 @@
 ✅ **🌳 深度思考**: 基于遗传算法的多分支思考引擎  
 ✅ **🔄 配置热更新**: 实时配置变更，无需重启应用  
 ✅ **💾 持久化上下文**: 重启后自动恢复历史对话上下文  
+✅ **🔧 系统检测**: 内置完整的系统环境检测和依赖验证功能  
 
 ---
 
@@ -156,14 +157,89 @@ docker run -d \
 
 ---
 
+## 📁 项目结构
+
+NagaAgent 3.1 采用模块化架构设计，各功能模块独立且可扩展：
+
+```
+NagaAgent/
+├── 📁 apiserver/              # API服务器模块
+│   ├── api_server.py          # FastAPI服务器
+│   ├── streaming_tool_extractor.py  # 流式工具调用提取器
+│   └── tool_call_utils.py     # 工具调用工具类
+├── 📁 system/                 # 系统核心模块
+│   ├── system_checker.py      # 系统环境检测器
+│   ├── config_manager.py      # 配置管理器
+│   └── conversation_core.py   # 对话核心引擎
+├── 📁 ui/                     # 用户界面模块
+│   ├── live2d/                # Live2D集成模块
+│   │   ├── renderer.py        # Live2D渲染器
+│   │   ├── animator.py        # 动画系统
+│   │   └── widget.py          # Live2D组件
+│   ├── live2d_side_widget.py  # Live2D侧栏容器
+│   ├── pyqt_chat_window.py    # 主聊天窗口
+│   └── message_renderer.py    # 消息渲染器
+├── 📁 voice/                  # 语音处理模块
+│   ├── input/                 # 语音输入服务
+│   │   ├── server.py          # ASR服务器
+│   │   ├── vad_worker.py      # VAD端点检测
+│   │   └── asr_client.py      # ASR客户端
+│   └── output/                # 语音输出服务
+│       ├── tts_handler.py     # TTS处理器
+│       └── voice_integration.py # 语音集成
+├── 📁 mcpserver/              # MCP服务模块
+│   ├── agent_manager.py       # Agent管理器
+│   ├── agent_*/               # 各种Agent服务
+│   └── mcp_manager.py         # MCP管理器
+├── 📁 thinking/               # 思考引擎模块
+│   ├── tree_thinking.py       # 树形思考引擎
+│   ├── genetic_pruning.py     # 遗传算法剪枝
+│   └── thinking_node.py       # 思考节点
+├── 📁 summer_memory/          # 记忆系统模块
+│   ├── memory_manager.py      # 记忆管理器
+│   ├── quintuple_extractor.py # 五元组提取器
+│   └── graph.py               # 图数据库操作
+├── 📁 logs/                   # 日志和存储
+│   ├── knowledge_graph/       # 知识图谱数据
+│   └── prompts/               # 提示词存储
+├── 📁 mqtt_tool/              # MQTT通信工具
+├── 📁 ui/tray/                # 系统托盘模块
+└── 📄 main.py                 # 主程序入口
+```
+
+**核心模块说明：**
+- **system/**: 系统核心功能，包括环境检测、配置管理、对话引擎
+- **ui/**: 用户界面，支持Live2D、PyQt5、系统托盘等
+- **voice/**: 语音处理，分离输入/输出，支持ASR和TTS
+- **mcpserver/**: MCP服务生态，支持多种Agent和工具
+- **thinking/**: 智能思考引擎，支持多分支推理
+- **summer_memory/**: 知识图谱记忆系统，基于Neo4j
+
+---
+
 ## 🛠️ 详细安装指南
 
-### 🔍 环境检查
+### 🔍 系统环境检测
 
-安装完成后，运行环境检查：
+NagaAgent 3.1 内置了完整的系统环境检测功能，自动检测Python版本、虚拟环境、依赖包等：
+
 ```bash
-python check_env.py
+# 运行系统环境检测
+python -c "from system.system_checker import SystemChecker; SystemChecker().check_all()"
+
+# 或者通过主程序自动检测
+python main.py --check-env
 ```
+
+**检测项目包括：**
+- ✅ Python版本兼容性检查
+- ✅ 虚拟环境状态检测
+- ✅ 核心依赖包完整性验证
+- ✅ 可选依赖包可用性检查
+- ✅ 配置文件格式验证
+- ✅ 目录结构完整性检查
+- ✅ 文件权限和访问性测试
+- ✅ 系统资源使用情况监控
 
 ### 📦 依赖说明
 

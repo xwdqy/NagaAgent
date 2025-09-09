@@ -85,7 +85,7 @@ async def lifespan(app: FastAPI):
     try:
         print("[INFO] 正在初始化NagaAgent...")
         # 延迟导入避免循环依赖
-        from conversation_core import NagaConversation
+        from system.conversation_core import NagaConversation
         naga_agent = NagaConversation()  # 第四次初始化：API服务器启动时创建
         print("[SUCCESS] NagaAgent初始化完成")
         yield

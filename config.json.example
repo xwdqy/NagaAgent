@@ -1,15 +1,16 @@
 {
   "system": {
     "version": "3.0",
+    "ai_name": "娜迦日达",
     "voice_enabled": true,
     "stream_mode": true,
     "debug": false,
-    "log_level": "DEBUG",
+    "log_level": "INFO",
     "save_prompts": true
   },
   "api": {
-    "api_key": " ",
-    "base_url": "https://phapi.furina.junmatec.cn/v1",
+    "api_key": "your-api-key-here",
+    "base_url": "https://naga.furina.chat/v1",
     "model": " ",
     "temperature": 0.7,
     "max_tokens": 10000,
@@ -97,5 +98,18 @@
     "viewport_width": 1280,
     "viewport_height": 720
   },
-  "invalid": "config"
+  "live2d": {
+    "enabled": false,
+    "model_path": "ui/live2d/live2d_models/characters/llny/mianfeimox/llny.model3.json",
+    "fallback_image": "ui/standby.png",
+    "auto_switch": true,
+    "animation_enabled": true,
+    "touch_interaction": true
+  },
+  "system_check": {
+    "passed": false,
+    "timestamp": "",
+    "python_version": "",
+    "project_path": ""
+  }
 }

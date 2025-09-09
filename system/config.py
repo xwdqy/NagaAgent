@@ -51,8 +51,8 @@ class SystemConfig(BaseModel):
     """系统基础配置"""
     version: str = Field(default="3.0", description="系统版本号")
     ai_name: str = Field(default="娜杰日达", description="AI助手名称")
-    base_dir: Path = Field(default_factory=lambda: Path(__file__).parent, description="项目根目录")
-    log_dir: Path = Field(default_factory=lambda: Path(__file__).parent / "logs", description="日志目录")
+    base_dir: Path = Field(default_factory=lambda: Path(__file__).parent.parent, description="项目根目录")
+    log_dir: Path = Field(default_factory=lambda: Path(__file__).parent.parent / "logs", description="日志目录")
     voice_enabled: bool = Field(default=True, description="是否启用语音功能")
     stream_mode: bool = Field(default=True, description="是否启用流式响应")
     debug: bool = Field(default=False, description="是否启用调试模式")
@@ -274,6 +274,13 @@ class OnlineSearchConfig(BaseModel):
     engines: List[str] = Field(default=["google"], description="默认搜索引擎列表")
     num_results: int = Field(default=5, ge=1, le=20, description="搜索结果数量")
 
+class SystemCheckConfig(BaseModel):
+    """系统检测状态配置"""
+    passed: bool = Field(default=False, description="系统检测是否通过")
+    timestamp: str = Field(default="", description="检测时间戳")
+    python_version: str = Field(default="", description="Python版本")
+    project_path: str = Field(default="", description="项目路径")
+
 class SystemPrompts(BaseModel):
     """系统提示词配置"""
     naga_system_prompt: str = Field(
@@ -357,6 +364,7 @@ class NagaConfig(BaseModel):
     live2d: Live2DConfig = Field(default_factory=Live2DConfig)
     naga_portal: NagaPortalConfig = Field(default_factory=NagaPortalConfig)
     online_search: OnlineSearchConfig = Field(default_factory=OnlineSearchConfig)
+    system_check: SystemCheckConfig = Field(default_factory=SystemCheckConfig)
 
     model_config = {"extra": "ignore"}
 
@@ -371,7 +379,7 @@ ENCF = 0  # 编码修复计数器
 def load_config():
     """加载配置"""
     global ENCF
-    config_path = "config.json"
+    config_path = str(Path(__file__).parent.parent / "config.json")
     
     if os.path.exists(config_path):
         try:

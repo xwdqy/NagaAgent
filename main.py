@@ -12,8 +12,9 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication
 
 # 本地模块导入
-from config import config, AI_NAME
-from conversation_core import NagaConversation
+from system.system_checker import run_system_check
+from system.config import config, AI_NAME
+from system.conversation_core import NagaConversation
 from summer_memory.memory_manager import memory_manager
 from summer_memory.task_manager import start_task_manager, task_manager
 from ui.pyqt_chat_window import ChatWindow
@@ -243,6 +244,20 @@ class NagaAgentAdapter:
 
 # 主程序入口
 if __name__ == "__main__":
+    # 系统环境检测
+    print("🚀 正在启动NagaAgent...")
+    print("=" * 50)
+    
+    # 执行系统检测（只在第一次启动时检测）
+    if not run_system_check():
+        print("\n❌ 系统环境检测失败，程序无法启动")
+        print("请根据上述建议修复问题后重新启动")
+        input("按回车键退出...")
+        sys.exit(1)
+    
+    print("\n🎉 系统环境检测通过，正在启动应用...")
+    print("=" * 50)
+    
     if not asyncio.get_event_loop().is_running():
         asyncio.set_event_loop(asyncio.new_event_loop())
     
