@@ -302,8 +302,8 @@ class ChatWindow(QWidget):
         s._img_inited = False  # 标志变量，图片自适应只在初始化时触发一次
         
         # Live2D相关配置
-        s.live2d_enabled = getattr(config, 'live2d', {}).get('enabled', False)  # 是否启用Live2D
-        s.live2d_model_path = getattr(config, 'live2d', {}).get('model_path', '')  # Live2D模型路径
+        s.live2d_enabled = getattr(getattr(config, 'live2d', None), 'enabled', False)
+        s.live2d_model_path = getattr(getattr(config, 'live2d', None), 'model_path', False)
         
         # 初始化消息存储
         s._messages = {}
