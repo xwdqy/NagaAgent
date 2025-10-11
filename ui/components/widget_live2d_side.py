@@ -10,7 +10,7 @@ from nagaagent_core.vendors.PyQt5.QtGui import QPixmap, QPainter, QColor, QBrush
 
 # 导入独立的Live2D模块
 try:
-    from .live2d import Live2DWidget
+    from ..live2d import Live2DWidget
     LIVE2D_AVAILABLE = True
 except ImportError as e:
     LIVE2D_AVAILABLE = False
@@ -145,7 +145,7 @@ class Live2DSideWidget(QWidget):
             self.load_image(self.fallback_image_path)
         else:
             # 使用默认图片
-            default_image = os.path.join(os.path.dirname(__file__), 'standby.png')
+            default_image = os.path.join(os.path.dirname(__file__), 'img/standby.png')
             if os.path.exists(default_image):
                 self.load_image(default_image)
         

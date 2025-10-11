@@ -1,10 +1,24 @@
 from nagaagent_core.vendors.PyQt5.QtWidgets import QApplication, QWidget, QTextEdit, QSizePolicy, QHBoxLayout, QLabel, QVBoxLayout, QStackedLayout, QPushButton, QStackedWidget, QDesktopWidget, QScrollArea, QSplitter, QFileDialog, QMessageBox, QFrame  # 统一入口 #
 from nagaagent_core.vendors.PyQt5.QtCore import Qt, QRect, QParallelAnimationGroup, QPropertyAnimation, QEasingCurve, QTimer, QThread, pyqtSignal, QObject  # 统一入口 #
 from nagaagent_core.vendors.PyQt5.QtGui import QColor, QPainter, QBrush, QFont, QPen  # 统一入口 #
-from ui.response_utils import extract_message
+from ..utils.response_util import extract_message
 from ui.message_renderer import MessageRenderer
-from ui.styles.progress_widget import EnhancedProgressWidget
+from ..components.widget_progress import EnhancedProgressWidget
+from system.config import config, AI_NAME
+import logging
+# 设置日志
+logger = logging.getLogger(__name__)
+            
+from nagaagent_core.vendors.PyQt5.QtWidgets import QVBoxLayout, QScrollArea, QLabel, QWidget
+from nagaagent_core.vendors.PyQt5.QtCore import QTimer, Qt
+import time
+import logging
+from typing import Dict, Optional, List, Tuple
+from ui.tools.tool_chat import getChatTool
 
+import logging
+# 设置日志
+logger = logging.getLogger(__name__)
 
 class _StreamHttpWorker(QThread):
     chunk = pyqtSignal(str)
@@ -143,21 +157,13 @@ class _NonStreamHttpWorker(QThread):
                 return
             try:
                 result = resp.json()
-                from ui.response_utils import extract_message
                 final_message = extract_message(result.get("response", ""))
             except Exception:
                 final_message = resp.text
             self.finished_text.emit(str(final_message))
         except Exception as e:
             self.error.emit(str(e))
-            
-from nagaagent_core.vendors.PyQt5.QtWidgets import QVBoxLayout, QScrollArea, QLabel, QWidget
-from nagaagent_core.vendors.PyQt5.QtCore import QTimer, Qt
-import time
-import logging
-from typing import Dict, Optional, List, Tuple
-
-class StreamingChatManager:
+class StreamingTool:
     """流式聊天管理器，负责处理所有与聊天相关的功能"""
     
     def __init__(self, 
@@ -167,7 +173,8 @@ class StreamingChatManager:
                  user_name: str,
                  ai_name: str,
                  streaming_mode: bool,
-                 logger: logging.Logger):
+                 logger: logging.Logger,
+                 window):
         """
         初始化流式聊天管理器
         
@@ -180,6 +187,11 @@ class StreamingChatManager:
             streaming_mode: 是否启用流式模式
             logger: 日志器
         """
+        #因为太常用了，所以缓存一下
+        self.chat_tool=getChatTool(window)
+        self.add_system_message=self.chat_tool.add_system_message
+        self.update_last_message=self.chat_tool.update_last_message
+        self.load_persistent_history=self.chat_tool.load_persistent_history
         # 外部依赖
         self._chat_layout = chat_layout
         self._chat_scroll_area = chat_scroll_area
@@ -216,181 +228,6 @@ class StreamingChatManager:
     # 消息管理核心方法
     # ------------------------------
     
-    def add_user_message(self, content: str) -> str:
-        """添加用户消息到聊天界面"""
-        msg = extract_message(content)
-        content_html = str(msg).replace('\\n', '\n').replace('\n', '<br>')
-        
-        # 生成消息ID
-        self._message_counter += 1
-        message_id = f"msg_{self._message_counter}"
-        
-        # 创建用户消息对话框
-        parent_widget = self._chat_layout.parentWidget()
-        message_dialog = MessageRenderer.create_user_message(
-            self._user_name, content_html, parent_widget
-        )
-        
-        # 存储消息信息
-        self._messages[message_id] = {
-            'name': self._user_name,
-            'content': content_html,
-            'full_content': content,
-            'dialog_widget': message_dialog,
-            'is_ai': False
-        }
-        
-        # 添加到布局
-        self._remove_layout_stretch()
-        self._chat_layout.addWidget(message_dialog)
-        self._chat_layout.addStretch()
-        
-        # 滚动到底部
-        self.smart_scroll_to_bottom()
-        return message_id
-    
-    def add_ai_message(self, content: str = "") -> str:
-        """添加AI消息到聊天界面（流式处理时初始化为空消息）"""
-        msg = extract_message(content)
-        content_html = str(msg).replace('\\n', '\n').replace('\n', '<br>')
-        
-        # 生成消息ID
-        self._message_counter += 1
-        message_id = f"msg_{self._message_counter}"
-        
-        # 创建AI消息对话框
-        parent_widget = self._chat_layout.parentWidget()
-        message_dialog = MessageRenderer.create_ai_message(
-            self._ai_name, content_html, parent_widget
-        )
-        
-        # 存储消息信息
-        self._messages[message_id] = {
-            'name': self._ai_name,
-            'content': content_html,
-            'full_content': content,
-            'dialog_widget': message_dialog,
-            'is_ai': True
-        }
-        
-        # 添加到布局
-        self._remove_layout_stretch()
-        self._chat_layout.addWidget(message_dialog)
-        self._chat_layout.addStretch()
-        
-        return message_id
-    
-    def add_system_message(self, content: str) -> str:
-        """添加系统消息到聊天界面"""
-        msg = extract_message(content)
-        content_html = str(msg).replace('\\n', '\n').replace('\n', '<br>')
-        
-        # 生成消息ID
-        self._message_counter += 1
-        message_id = f"msg_{self._message_counter}"
-        
-        # 创建系统消息对话框
-        parent_widget = self._chat_layout.parentWidget()
-        message_dialog = MessageRenderer.create_system_message(
-            "系统", content_html, parent_widget
-        )
-        
-        # 存储消息信息
-        self._messages[message_id] = {
-            'name': "系统",
-            'content': content_html,
-            'full_content': content,
-            'dialog_widget': message_dialog,
-            'is_ai': False,
-            'is_system': True
-        }
-        
-        # 添加到布局
-        self._remove_layout_stretch()
-        self._chat_layout.addWidget(message_dialog)
-        self._chat_layout.addStretch()
-        
-        # 滚动到底部
-        self.smart_scroll_to_bottom()
-        return message_id
-    
-    def update_last_message(self, new_text: str):
-        """更新最后一条消息的内容"""
-        if not self._messages:
-            return
-        
-        # 获取最后一条消息ID
-        last_msg_id = max(self._messages.keys(), key=lambda x: int(x.split('_')[-1]))
-        last_msg = self._messages[last_msg_id]
-        
-        # 格式化内容
-        msg = extract_message(new_text)
-        content_html = str(msg).replace('\\n', '\n').replace('\n', '<br>')
-        
-        # 更新存储与UI
-        last_msg['content'] = content_html
-        last_msg['full_content'] = new_text
-        MessageRenderer.update_message_content(last_msg['dialog_widget'], content_html)
-        
-        # 智能滚动
-        self.smart_scroll_to_bottom()
-    
-    def clear_chat_history(self):
-        """清除所有聊天历史"""
-        # 清除UI组件
-        for msg_id, msg_info in self._messages.items():
-            if msg_info['dialog_widget']:
-                msg_info['dialog_widget'].deleteLater()
-        
-        # 清除布局
-        while self._chat_layout.count() > 0:
-            item = self._chat_layout.takeAt(0)
-            if item and item.widget():
-                item.widget().deleteLater()
-        
-        # 重置状态
-        self._messages.clear()
-        self._message_counter = 0
-        self._current_message_id = None
-        self._current_response = ""
-        
-        # 恢复stretch
-        self._chat_layout.addStretch()
-    
-    def load_persistent_history(self, max_messages: int = 20):
-        """从持久化存储加载历史对话"""
-        try:
-            # 调用MessageRenderer加载历史
-            ui_messages = MessageRenderer.load_persistent_context_to_ui(
-                parent_widget=self._chat_layout.parentWidget(),
-                max_messages=max_messages
-            )
-            
-            if not ui_messages:
-                self._logger.info("未加载到历史对话")
-                return
-            
-            # 清空现有布局
-            self._remove_layout_stretch()
-            while self._chat_layout.count() > 0:
-                item = self._chat_layout.takeAt(0)
-                if item and item.widget():
-                    item.widget().deleteLater()
-            
-            # 加载历史消息到UI和存储
-            for message_id, message_info, dialog in ui_messages:
-                self._chat_layout.addWidget(dialog)
-                self._messages[message_id] = message_info
-                self._message_counter = max(self._message_counter, int(message_id.split('_')[-1]))
-            
-            # 恢复stretch并滚动到底部
-            self._chat_layout.addStretch()
-            self.scroll_to_bottom()
-            self._logger.info(f"加载完成 {len(ui_messages)} 条历史对话")
-        
-        except Exception as e:
-            self._logger.error(f"加载历史对话失败: {str(e)}")
-            self.add_system_message(f"❌ 加载历史对话失败: {str(e)}")
 
     # ------------------------------
     # 流式响应处理
@@ -787,3 +624,21 @@ class StreamingChatManager:
     def messages(self) -> Dict[str, Dict]:
         """获取所有消息"""
         return self._messages.copy()  # 返回副本，防止外部修改
+
+from ..utils.lazy import lazy
+tool = None
+@lazy
+def stream():
+    window=config.window
+    if tool is None:
+        tool = StreamingTool(
+            chat_layout=window.chatui.chat_layout,
+            chat_scroll_area=window.chatui.chat_scroll_area,
+            progress_widget=window.chatui.progress_widget,
+            user_name=config.ui.user_name,
+            ai_name=AI_NAME,
+            streaming_mode=window.chatui.streaming_mode,
+            logger=logger,
+            window=window
+        )
+    return tool
